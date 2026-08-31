@@ -58,6 +58,9 @@ public class DailyAdviceService {
     @Resource
     private ChatMessageMapper chatMessageMapper;
 
+    @Resource
+    private UsageStatisticsService usageStatisticsService;
+
     private final ChatModel chatModel;
 
     public DailyAdviceService(@Qualifier("dashscopeChatModel") ChatModel chatModel) {
@@ -122,6 +125,8 @@ public class DailyAdviceService {
             advice.setCreateTime(new Date());
             dailyAdviceMapper.insert(advice);
             log.info("用户 {} 今日情感建议已生成", userId);
+            // 记录用量
+            usageStatisticsService.recordUsage(userId, "advice_generate", "dashscope", 0);
             return advice;
         } catch (Exception e) {
             log.error("为用户 {} 生成每日建议失败: {}", userId, e.getMessage());

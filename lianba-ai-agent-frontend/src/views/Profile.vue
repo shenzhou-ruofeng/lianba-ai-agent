@@ -82,6 +82,48 @@
             </div>
           </section>
 
+          <!-- 会员等级 & 用量统计 -->
+          <section class="info-section">
+            <h2 class="section-title">会员等级</h2>
+            <div v-if="membership" class="membership-card">
+              <div class="membership-header">
+                <span class="membership-icon">{{ membership.tierIcon }}</span>
+                <div class="membership-info">
+                  <span class="membership-label">{{ membership.tierLabel }}</span>
+                  <span v-if="membership.nextTier" class="membership-next">距下一等级 {{ membership.nextTier }}</span>
+                  <span v-else class="membership-next">已达最高等级 ✨</span>
+                </div>
+              </div>
+              <div class="membership-progress-bar">
+                <div class="membership-progress-fill" :style="{ width: membership.progress + '%' }"></div>
+              </div>
+              <div class="membership-progress-text">{{ membership.progress }}%</div>
+              <div class="usage-grid">
+                <div class="usage-item">
+                  <span class="usage-num">{{ membership.todayChats }}</span>
+                  <span class="usage-label">今日对话</span>
+                </div>
+                <div class="usage-item">
+                  <span class="usage-num">{{ membership.totalChats }}</span>
+                  <span class="usage-label">累计对话</span>
+                </div>
+                <div class="usage-item">
+                  <span class="usage-num">{{ membership.todayDiaries }}</span>
+                  <span class="usage-label">今日日记</span>
+                </div>
+                <div class="usage-item">
+                  <span class="usage-num">{{ membership.totalDiaries }}</span>
+                  <span class="usage-label">累计日记</span>
+                </div>
+                <div class="usage-item">
+                  <span class="usage-num">{{ membership.totalReports }}</span>
+                  <span class="usage-label">累计报告</span>
+                </div>
+              </div>
+            </div>
+            <div v-else class="membership-loading">加载中...</div>
+          </section>
+
           <!-- 今日情感建议 -->
           <section class="info-section">
             <h2 class="section-title">今日情感建议</h2>
@@ -123,6 +165,10 @@
                 <span aria-hidden="true">📝</span>
                 情感日记
               </router-link>
+              <router-link to="/community" class="quick-btn">
+                <span aria-hidden="true">🌸</span>
+                情感社区
+              </router-link>
               <router-link to="/export" class="quick-btn">
                 <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
@@ -154,7 +200,7 @@ import AppHeader from '../components/AppHeader.vue'
 import AppFooter from '../components/AppFooter.vue'
 import { useAuth } from '../composables/useAuth'
 import { useSessionStore } from '../composables/useSessionStore'
-import { getTodayAdvice, getAdviceHistory, generateAdvice } from '../api'
+import { getTodayAdvice, getAdviceHistory, generateAdvice, getMembershipStatus } from '../api'
 
 useHead({
   title: '个人信息 - 恋吧AI超级智能体应用平台',
@@ -205,6 +251,9 @@ const saveNickname = async () => {
   }
 }
 
+// 会员等级 & 用量统计
+const membership = ref(null)
+
 // 每日情感建议
 const todayAdvice = ref(null)
 const adviceHistory = ref([])
@@ -231,6 +280,13 @@ onMounted(async () => {
   initSessions(user ? user.id : '')
   // 预填当前昵称供编辑
   nickname.value = user?.userName || ''
+  // 加载会员等级 & 用量统计
+  try {
+    const memRes = await getMembershipStatus()
+    if (memRes.code === 0) membership.value = memRes.data
+  } catch (e) {
+    console.error('加载会员等级失败:', e)
+  }
   // 加载今日建议
   try {
     const [adviceRes, historyRes] = await Promise.all([
@@ -510,6 +566,98 @@ onMounted(async () => {
 }
 
 /* 每日情感建议 */
+.membership-card {
+  background: linear-gradient(135deg, #fff8f0, #fffaf5);
+  border: 1px solid #fde8d0;
+  border-radius: 14px;
+  padding: 20px;
+}
+
+.membership-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.membership-icon {
+  font-size: 2.2rem;
+}
+
+.membership-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.membership-label {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #444;
+}
+
+.membership-next {
+  font-size: 0.82rem;
+  color: #999;
+}
+
+.membership-progress-bar {
+  height: 8px;
+  background: #f0e4e0;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.membership-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ff8fa3, #ffb347);
+  border-radius: 999px;
+  transition: width 0.6s ease;
+}
+
+.membership-progress-text {
+  font-size: 0.75rem;
+  color: #bbb;
+  text-align: right;
+  margin-bottom: 16px;
+}
+
+.membership-loading {
+  padding: 16px 0;
+  color: #aaa;
+  font-size: 0.88rem;
+}
+
+.usage-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.usage-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 6px;
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid #fde8d0;
+}
+
+.usage-num {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #e05575;
+}
+
+.usage-label {
+  font-size: 0.72rem;
+  color: #999;
+}
+
+/* 每日情感建议 */
 .advice-loading {
   display: flex;
   align-items: center;
@@ -702,6 +850,10 @@ onMounted(async () => {
 
   .stat-grid {
     grid-template-columns: 1fr;
+  }
+
+  .usage-grid {
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 </style>

@@ -42,6 +42,9 @@ public class DiaryService {
     @Resource
     private DiaryMapper diaryMapper;
 
+    @Resource
+    private UsageStatisticsService usageStatisticsService;
+
     private final ChatModel chatModel;
 
     public DiaryService(@Qualifier("dashscopeChatModel") ChatModel chatModel) {
@@ -66,6 +69,9 @@ public class DiaryService {
         diary.setCreateTime(new Date());
         diary.setUpdateTime(new Date());
         diaryMapper.insert(diary);
+
+        // 记录用量
+        usageStatisticsService.recordUsage(userId, "diary_create", "dashscope", 0);
 
         // 异步触发 AI 分析（失败不影响日记保存）
         try {
@@ -127,6 +133,8 @@ public class DiaryService {
             update.setUpdateTime(new Date());
             diaryMapper.updateById(update);
             diary.setAiAnalysis(analysis);
+            // 记录分析用量
+            usageStatisticsService.recordUsage(userId, "diary_analyze", "dashscope", 0);
         } catch (Exception e) {
             log.error("日记 AI 分析失败: {}", e.getMessage());
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "AI 分析失败，请稍后重试");

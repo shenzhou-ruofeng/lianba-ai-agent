@@ -69,6 +69,16 @@ const routes = [
       description: '记录每天的心情，AI 帮你分析情绪变化，见证你的情感成长。',
       requiresAuth: true
     }
+  },
+  {
+    path: '/community',
+    name: 'Community',
+    component: () => import('../views/Community.vue'),
+    meta: {
+      title: '情感社区 - 恋吧AI',
+      description: '匿名倾诉情感故事、分享恋爱喜悦、寻求温暖互助。',
+      requiresAuth: true
+    }
   }
 ]
 

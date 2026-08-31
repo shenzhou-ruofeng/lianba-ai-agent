@@ -13,6 +13,7 @@ import com.lianba.aiagent.rag.LoveAppContextualQueryAugmenterFactory;
 import com.lianba.aiagent.rag.LoveAppDocumentLoader;
 import com.lianba.aiagent.rag.LoveAppRagCustomAdvisorFactory;
 import com.lianba.aiagent.rag.QueryRewriter;
+import com.lianba.aiagent.service.UsageStatisticsService;
 import com.lianba.aiagent.service.UserService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -72,6 +73,9 @@ public class LoveApp {
 
     @Resource
     private UserService userService;
+
+    @Resource
+    private UsageStatisticsService usageStatisticsService;
 
     private static final String SYSTEM_PROMPT = """
             你是深耕恋爱心理领域的专家，同时也是一位贴心的生活助手。
@@ -657,6 +661,15 @@ public class LoveApp {
                     sendSse(sseEmitter, buildFilesJson(generatedFiles));
                 }
 
+                // 记录用量（chat_message）
+                Long userId = resolveUserIdFromChatId(chatId);
+                if (userId != null) {
+                    usageStatisticsService.recordUsage(userId, "chat_message", "dashscope", 0);
+                    if (round > 0) {
+                        usageStatisticsService.recordUsage(userId, "tool_call", "dashscope", 0);
+                    }
+                }
+
                 sendSse(sseEmitter, "[DONE]");
                 sseEmitter.complete();
             } catch (Exception e) {
@@ -678,6 +691,22 @@ public class LoveApp {
         sseEmitter.onCompletion(() -> log.info("[工具对话] chatId: {} SSE 连接完成", chatId));
 
         return sseEmitter;
+    }
+
+    /**
+     * 通过 chatId 反查 userId
+     */
+    private Long resolveUserIdFromChatId(String chatId) {
+        try {
+            com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ChatSession> wrapper =
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+            wrapper.eq(ChatSession::getSessionId, chatId).last("LIMIT 1");
+            ChatSession session = chatSessionMapper.selectOne(wrapper);
+            return session != null ? session.getUserId() : null;
+        } catch (Exception e) {
+            log.warn("通过 chatId 反查 userId 失败: {}", e.getMessage());
+            return null;
+        }
     }
 
     /**

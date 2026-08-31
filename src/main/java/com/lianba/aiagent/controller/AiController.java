@@ -15,6 +15,7 @@ import com.lianba.aiagent.service.AgentTaskService;
 import com.lianba.aiagent.service.LoveReportExportService;
 import com.lianba.aiagent.service.LoveReportService;
 import com.lianba.aiagent.service.MiMoVisionService;
+import com.lianba.aiagent.service.UsageStatisticsService;
 import com.lianba.aiagent.service.UserService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
@@ -65,6 +66,9 @@ public class AiController {
 
     @Resource
     private UserService userService;
+
+    @Resource
+    private UsageStatisticsService usageStatisticsService;
 
     @Resource
     private AgentTaskService agentTaskService;
@@ -198,7 +202,10 @@ public class AiController {
         LoginUserVO loginUser = userService.getLoginUser(request);
         LoveReport report = loveApp.doChatWithReport(message, chatId);
         // 自动保存到数据库
-        return loveReportService.saveReport(loginUser.getId(), chatId, report);
+        LoveReportVO saved = loveReportService.saveReport(loginUser.getId(), chatId, report);
+        // 记录用量
+        usageStatisticsService.recordUsage(loginUser.getId(), "report_generate", "dashscope", 0);
+        return saved;
     }
 
     /**

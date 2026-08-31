@@ -484,6 +484,48 @@ export const generateAdvice = async () => {
   return res.data
 }
 
+// ============ 会员等级 ============
+
+// 获取会员等级 + 用量统计
+export const getMembershipStatus = async () => {
+  const res = await request.get('/membership/status')
+  return res.data
+}
+
+// ============ 情感社区 ============
+
+// 获取帖子列表
+export const listPosts = async (tag, page = 1, size = 20) => {
+  const params = { page, size }
+  if (tag) params.tag = tag
+  const res = await request.get('/community/posts', { params })
+  return res.data
+}
+
+// 发帖
+export const createPost = async (content, tag, nickname) => {
+  const res = await request.post('/community/post', { content, tag, nickname })
+  return res.data
+}
+
+// 获取帖子详情 + 评论
+export const getPost = async (id) => {
+  const res = await request.get(`/community/post/${id}`)
+  return res.data
+}
+
+// 评论
+export const createComment = async (postId, content, nickname) => {
+  const res = await request.post(`/community/post/${postId}/comment`, { content, nickname })
+  return res.data
+}
+
+// 点赞
+export const likePost = async (postId) => {
+  const res = await request.post(`/community/post/${postId}/like`)
+  return res.data
+}
+
 export default {
   chatWithLoveApp,
   chatWithLoveAppVision,
@@ -520,5 +562,11 @@ export default {
   getRelationshipTimeline,
   getTodayAdvice,
   getAdviceHistory,
-  generateAdvice
+  generateAdvice,
+  getMembershipStatus,
+  listPosts,
+  createPost,
+  getPost,
+  createComment,
+  likePost
 } 
