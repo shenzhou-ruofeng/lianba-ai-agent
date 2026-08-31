@@ -9,7 +9,7 @@ RUN mvn clean package -DskipTests
 # 运行阶段：仅保留 JRE 运行环境，镜像更小
 FROM amazoncorretto:21
 WORKDIR /app
-COPY --from=builder /app/target/yu-ai-agent-0.0.1-SNAPSHOT.jar app.jar
+COPY --from=builder /app/target/lianba-ai-agent-0.0.1-SNAPSHOT.jar app.jar
 ENV SPRING_PROFILES_ACTIVE=prod
 ENV JAVA_OPTS="-Dfile.encoding=UTF-8"
 EXPOSE 8123

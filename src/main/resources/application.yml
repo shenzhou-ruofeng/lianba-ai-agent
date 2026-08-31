@@ -1,6 +1,6 @@
 spring:
   application:
-    name: yu-ai-agent
+    name: lianba-ai-agent
   profiles:
     active: local
   servlet:
@@ -55,6 +55,17 @@ server:
   port: 8123
   servlet:
     context-path: /api
+# MyBatis-Plus 配置
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: isDeleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
 # RAG 混合检索（向量语义检索 + 关键词全文检索，多数据源 RRF 融合）
 rag:
   hybrid:
@@ -75,7 +86,7 @@ springdoc:
   group-configs:
     - group: 'default'
       paths-to-match: '/**'
-      packages-to-scan: com.yupi.yuaiagent.controller
+      packages-to-scan: com.lianba.aiagent.controller
 # knife4j config
 knife4j:
   enable: true

@@ -1,10 +1,10 @@
 services:
   postgres:
     image: pgvector/pgvector:pg16
-    container_name: yu-ai-agent-postgres
+    container_name: lianba-ai-agent-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${DB_NAME:-yu_ai_agent}
+      POSTGRES_DB: ${DB_NAME:-lianba_ai_agent}
       POSTGRES_USER: ${DB_USERNAME:-shenzhou_ruofeng}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-your-db-password}
     ports:
@@ -12,18 +12,18 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-shenzhou_ruofeng} -d ${DB_NAME:-yu_ai_agent}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-shenzhou_ruofeng} -d ${DB_NAME:-lianba_ai_agent}"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - yu-ai-agent-net
+      - lianba-ai-agent-net
 
   mcp-server:
     build:
-      context: ./yu-image-search-mcp-server
+      context: ./image-search-mcp-server
       dockerfile: Dockerfile
-    container_name: yu-ai-agent-mcp-server
+    container_name: lianba-ai-agent-mcp-server
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: sse
@@ -37,13 +37,13 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - yu-ai-agent-net
+      - lianba-ai-agent-net
 
   backend:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: yu-ai-agent-backend
+    container_name: lianba-ai-agent-backend
     restart: unless-stopped
     depends_on:
       postgres:
@@ -53,7 +53,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: prod
       # 数据库指向 compose 内的 postgres 服务
-      DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-yu_ai_agent}
+      DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-lianba_ai_agent}
       DB_USERNAME: ${DB_USERNAME:-shenzhou_ruofeng}
       DB_PASSWORD: ${DB_PASSWORD:-your-db-password}
       # MCP 服务指向 compose 内的 mcp-server 服务（客户端会自动追加 /sse）
@@ -65,24 +65,24 @@ services:
       # 持久化解析产物（file/pdf 等）
       - ./tmp:/app/tmp
     networks:
-      - yu-ai-agent-net
+      - lianba-ai-agent-net
 
   frontend:
     build:
-      context: ./yu-ai-agent-frontend
+      context: ./lianba-ai-agent-frontend
       dockerfile: Dockerfile
-    container_name: yu-ai-agent-frontend
+    container_name: lianba-ai-agent-frontend
     restart: unless-stopped
     depends_on:
       - backend
     ports:
       - "80:80"
     networks:
-      - yu-ai-agent-net
+      - lianba-ai-agent-net
 
 volumes:
   pgdata:
 
 networks:
-  yu-ai-agent-net:
+  lianba-ai-agent-net:
     driver: bridge

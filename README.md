@@ -165,7 +165,7 @@ RAG 核心特性实战：
 
 利用 GitHub 搭建开源代码仓库，点 star 的都是精神股东
 
-代码仓库：https://github.com/liyupi/yu-ai-agent
+代码仓库：https://github.com/liyupi/lianba-ai-agent
 
 ### AI 学习资源
 
