@@ -82,10 +82,47 @@
             </div>
           </section>
 
+          <!-- 今日情感建议 -->
+          <section class="info-section">
+            <h2 class="section-title">今日情感建议</h2>
+            <div v-if="loadingAdvice" class="advice-loading">
+              <span class="advice-spinner"></span> 加载中...
+            </div>
+            <div v-else-if="todayAdvice" class="advice-card">
+              <p class="advice-content">{{ todayAdvice.content }}</p>
+              <div class="advice-footer">
+                <span class="advice-date">{{ formatDate(todayAdvice.adviceDate || todayAdvice.createTime) }}</span>
+                <button class="advice-regen-btn" :disabled="generatingAdvice" @click="handleGenerateAdvice">
+                  {{ generatingAdvice ? '生成中...' : '重新生成' }}
+                </button>
+              </div>
+              <div v-if="adviceHistory.length" class="advice-history-toggle" @click="showAdviceHistory = !showAdviceHistory">
+                <span>{{ showAdviceHistory ? '收起历史' : '查看最近建议' }}</span>
+                <span>{{ showAdviceHistory ? '▲' : '▼' }}</span>
+              </div>
+              <div v-show="showAdviceHistory" class="advice-history-list">
+                <div v-for="adv in adviceHistory" :key="adv.id" class="advice-history-item">
+                  <span class="advice-history-date">{{ formatDate(adv.adviceDate || adv.createTime) }}</span>
+                  <p class="advice-history-content">{{ adv.content }}</p>
+                </div>
+              </div>
+            </div>
+            <div v-else class="advice-empty">
+              <p>今天还没有建议哦</p>
+              <button class="advice-gen-btn" :disabled="generatingAdvice" @click="handleGenerateAdvice">
+                {{ generatingAdvice ? '生成中...' : '✨ 生成今日建议' }}
+              </button>
+            </div>
+          </section>
+
           <!-- 快捷操作 -->
           <section class="info-section">
             <h2 class="section-title">快捷操作</h2>
             <div class="quick-actions">
+              <router-link to="/diary" class="quick-btn">
+                <span aria-hidden="true">📝</span>
+                情感日记
+              </router-link>
               <router-link to="/export" class="quick-btn">
                 <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
@@ -117,6 +154,7 @@ import AppHeader from '../components/AppHeader.vue'
 import AppFooter from '../components/AppFooter.vue'
 import { useAuth } from '../composables/useAuth'
 import { useSessionStore } from '../composables/useSessionStore'
+import { getTodayAdvice, getAdviceHistory, generateAdvice } from '../api'
 
 useHead({
   title: '个人信息 - 恋吧AI超级智能体应用平台',
@@ -167,11 +205,45 @@ const saveNickname = async () => {
   }
 }
 
+// 每日情感建议
+const todayAdvice = ref(null)
+const adviceHistory = ref([])
+const loadingAdvice = ref(true)
+const generatingAdvice = ref(false)
+const showAdviceHistory = ref(false)
+
+const handleGenerateAdvice = async () => {
+  generatingAdvice.value = true
+  try {
+    const res = await generateAdvice()
+    if (res.code === 0 && res.data) {
+      todayAdvice.value = res.data
+    }
+  } catch (e) {
+    console.error('生成建议失败:', e)
+  } finally {
+    generatingAdvice.value = false
+  }
+}
+
 onMounted(async () => {
   const user = await refreshLoginUser(true)
   initSessions(user ? user.id : '')
   // 预填当前昵称供编辑
   nickname.value = user?.userName || ''
+  // 加载今日建议
+  try {
+    const [adviceRes, historyRes] = await Promise.all([
+      getTodayAdvice(),
+      getAdviceHistory(7)
+    ])
+    if (adviceRes.code === 0) todayAdvice.value = adviceRes.data
+    if (historyRes.code === 0 && historyRes.data) adviceHistory.value = historyRes.data
+  } catch (e) {
+    console.error('加载建议失败:', e)
+  } finally {
+    loadingAdvice.value = false
+  }
 })
 </script>
 
@@ -435,6 +507,147 @@ onMounted(async () => {
 .stat-box-label {
   font-size: 0.78rem;
   color: var(--ink-soft);
+}
+
+/* 每日情感建议 */
+.advice-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #aaa;
+  font-size: 0.88rem;
+  padding: 12px 0;
+}
+
+.advice-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #f0e4e8;
+  border-top-color: #e05575;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.advice-card {
+  background: linear-gradient(135deg, #fff5f7, #fff9fb);
+  border: 1px solid #fdeef0;
+  border-radius: 14px;
+  padding: 18px 20px;
+}
+
+.advice-content {
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: #444;
+  margin-bottom: 12px;
+}
+
+.advice-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.advice-date {
+  font-size: 0.78rem;
+  color: #bbb;
+}
+
+.advice-regen-btn {
+  padding: 5px 14px;
+  border-radius: 999px;
+  border: 1px solid #ffd6e0;
+  background: #fff;
+  font-size: 0.78rem;
+  color: #e05575;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.advice-regen-btn:hover:not(:disabled) {
+  background: #fff0f3;
+  border-color: #ff8fab;
+}
+
+.advice-regen-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.advice-history-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px dashed #fdeef0;
+  font-size: 0.82rem;
+  color: #999;
+  cursor: pointer;
+}
+
+.advice-history-toggle:hover {
+  color: #e05575;
+}
+
+.advice-history-list {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.advice-history-item {
+  padding: 10px 14px;
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid #fdeef0;
+}
+
+.advice-history-date {
+  font-size: 0.75rem;
+  color: #bbb;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.advice-history-content {
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: #666;
+  margin: 0;
+}
+
+.advice-empty {
+  text-align: center;
+  padding: 20px 0;
+  color: #999;
+  font-size: 0.9rem;
+}
+
+.advice-gen-btn {
+  margin-top: 12px;
+  padding: 10px 24px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ff6b8b, #ff8fa3);
+  color: #fff;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 16px rgba(255, 107, 139, 0.2);
+}
+
+.advice-gen-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(255, 107, 139, 0.3);
+}
+
+.advice-gen-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* 快捷操作 */

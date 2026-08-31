@@ -424,6 +424,66 @@ export const getManusTask = async (taskId) => {
   return res.data
 }
 
+// ============ 情感日记 ============
+
+// 创建日记
+export const createDiary = async (content, mood, tags) => {
+  const res = await request.post('/diary', { content, mood, tags })
+  return res.data
+}
+
+// 获取日记列表
+export const listDiaries = async () => {
+  const res = await request.get('/diary/list')
+  return res.data
+}
+
+// 获取日记详情
+export const getDiary = async (id) => {
+  const res = await request.get(`/diary/${id}`)
+  return res.data
+}
+
+// 删除日记
+export const deleteDiary = async (id) => {
+  const res = await request.delete(`/diary/${id}`)
+  return res.data
+}
+
+// 重新触发 AI 情绪分析
+export const analyzeDiary = async (id) => {
+  const res = await request.post(`/diary/${id}/analyze`)
+  return res.data
+}
+
+// ============ 关系状态时间线 ============
+
+// 获取关系状态变更时间线
+export const getRelationshipTimeline = async () => {
+  const res = await request.get('/user/relationship_timeline')
+  return res.data
+}
+
+// ============ 每日情感建议 ============
+
+// 获取今日建议
+export const getTodayAdvice = async () => {
+  const res = await request.get('/advice/today')
+  return res.data
+}
+
+// 获取建议历史
+export const getAdviceHistory = async (days = 7) => {
+  const res = await request.get('/advice/history', { params: { days } })
+  return res.data
+}
+
+// 手动生成今日建议
+export const generateAdvice = async () => {
+  const res = await request.post('/advice/generate')
+  return res.data
+}
+
 export default {
   chatWithLoveApp,
   chatWithLoveAppVision,
@@ -451,5 +511,14 @@ export default {
   exportChatSession,
   stopManusTask,
   listManusTasks,
-  getManusTask
+  getManusTask,
+  createDiary,
+  listDiaries,
+  getDiary,
+  deleteDiary,
+  analyzeDiary,
+  getRelationshipTimeline,
+  getTodayAdvice,
+  getAdviceHistory,
+  generateAdvice
 } 

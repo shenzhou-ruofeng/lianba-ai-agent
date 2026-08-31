@@ -31,10 +31,10 @@ public class LoveAppVectorStoreConfig {
         SimpleVectorStore simpleVectorStore = SimpleVectorStore.builder(dashscopeEmbeddingModel).build();
         // 加载文档
         List<Document> documentList = loveAppDocumentLoader.loadMarkdowns();
-        // 自主切分文档
-//        List<Document> splitDocuments = myTokenTextSplitter.splitCustomized(documentList);
+        // 自主切分文档（扩充后文档较长，切分后检索精度更高）
+        List<Document> splitDocuments = myTokenTextSplitter.splitCustomized(documentList);
         // 自动补充关键词元信息
-        List<Document> enrichedDocuments = myKeywordEnricher.enrichDocuments(documentList);
+        List<Document> enrichedDocuments = myKeywordEnricher.enrichDocuments(splitDocuments);
         simpleVectorStore.add(enrichedDocuments);
         return simpleVectorStore;
     }

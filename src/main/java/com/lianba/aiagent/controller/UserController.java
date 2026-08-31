@@ -7,6 +7,7 @@ import com.lianba.aiagent.model.dto.UpdateNicknameDTO;
 import com.lianba.aiagent.model.dto.UpdateUserProfileDTO;
 import com.lianba.aiagent.model.dto.UserLoginDTO;
 import com.lianba.aiagent.model.dto.UserRegisterDTO;
+import com.lianba.aiagent.model.entity.RelationshipLog;
 import com.lianba.aiagent.model.vo.LoginUserVO;
 import com.lianba.aiagent.service.UserService;
 import jakarta.annotation.Resource;
@@ -16,6 +17,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /**
  * 用户接口：注册 / 登录 / 注销 / 获取当前登录用户
@@ -86,6 +89,15 @@ public class UserController {
         LoginUserVO loginUser = userService.getLoginUser(request);
         LoginUserVO updated = userService.updateUserProfile(loginUser.getId(), updateDTO.getRelationshipStatus(), request);
         return ResultUtils.success(updated);
+    }
+
+    /**
+     * 获取用户关系状态变更时间线
+     */
+    @GetMapping("/relationship_timeline")
+    public BaseResponse<List<RelationshipLog>> getRelationshipTimeline(HttpServletRequest request) {
+        LoginUserVO loginUser = userService.getLoginUser(request);
+        return ResultUtils.success(userService.getRelationshipTimeline(loginUser.getId()));
     }
 
     /**

@@ -308,12 +308,8 @@ public class LoveApp {
                 // 使用改写后的查询，附加课程链接约束（涉及课程推荐时注入清单）
                 .user(rewrittenMessage + buildCoursePrompt(rewrittenMessage))
                 .advisors(spec -> spec.param(ChatMemory.CONVERSATION_ID, chatId))
-                // 应用 RAG 知识库检索增强（排除恋爱对象候选人文档）
-                .advisors(QuestionAnswerAdvisor.builder(loveAppVectorStore)
-                        .searchRequest(SearchRequest.builder()
-                                .filterExpression("status != '对象'")
-                                .build())
-                        .build())
+                // 应用混合检索 RAG 增强（向量语义 + 关键词全文，RRF 融合排序）
+                .advisors(loveAppHybridRagAdvisor)
                 .stream()
                 .content();
     }

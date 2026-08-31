@@ -59,6 +59,16 @@ const routes = [
       description: '查看 AI 为你生成的恋爱报告，支持 PDF / Word / Markdown 下载',
       requiresAuth: true
     }
+  },
+  {
+    path: '/diary',
+    name: 'Diary',
+    component: () => import('../views/Diary.vue'),
+    meta: {
+      title: '情感日记 - 恋吧AI',
+      description: '记录每天的心情，AI 帮你分析情绪变化，见证你的情感成长。',
+      requiresAuth: true
+    }
   }
 ]
 

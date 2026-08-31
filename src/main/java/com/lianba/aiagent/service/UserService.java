@@ -8,7 +8,9 @@ import com.lianba.aiagent.constant.UserConstant;
 import com.lianba.aiagent.exception.BusinessException;
 import com.lianba.aiagent.exception.ErrorCode;
 import com.lianba.aiagent.exception.ThrowUtils;
+import com.lianba.aiagent.mapper.RelationshipLogMapper;
 import com.lianba.aiagent.mapper.UserMapper;
+import com.lianba.aiagent.model.entity.RelationshipLog;
 import com.lianba.aiagent.model.entity.User;
 import com.lianba.aiagent.model.vo.LoginUserVO;
 import jakarta.annotation.PostConstruct;
@@ -22,6 +24,7 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
@@ -79,13 +82,16 @@ public class UserService {
     private final AtomicLong memoryIdGenerator = new AtomicLong(1);
 
     private final UserMapper userMapper;
+    private final RelationshipLogMapper relationshipLogMapper;
 
     private volatile boolean databaseAvailable = false;
 
     public UserService(ObjectProvider<UserMapper> userMapperProvider,
-                       ObjectProvider<JavaMailSender> mailSenderProvider) {
+                       ObjectProvider<JavaMailSender> mailSenderProvider,
+                       ObjectProvider<RelationshipLogMapper> relationshipLogMapperProvider) {
         this.userMapper = userMapperProvider.getIfAvailable();
         this.mailSenderProvider = mailSenderProvider;
+        this.relationshipLogMapper = relationshipLogMapperProvider.getIfAvailable();
     }
 
     /**
@@ -270,12 +276,15 @@ public class UserService {
                 ErrorCode.PARAMS_ERROR, "情感状态值不合法");
         User user = findById(userId);
         ThrowUtils.throwIf(user == null, ErrorCode.NOT_FOUND_ERROR, "用户不存在");
+        String oldStatus = user.getRelationshipStatus();
         if (databaseAvailable) {
             try {
                 User updateUser = new User();
                 updateUser.setId(userId);
                 updateUser.setRelationshipStatus(relationshipStatus);
                 userMapper.updateById(updateUser);
+                // 记录关系状态变更日志
+                logRelationshipChange(userId, oldStatus, relationshipStatus);
             } catch (Exception e) {
                 log.error("更新用户画像失败: {}", e.getMessage());
                 throw new BusinessException(ErrorCode.SYSTEM_ERROR, "保存失败，请稍后重试");
@@ -365,6 +374,43 @@ public class UserService {
         user.setFromMemory(true);
         memoryUserStore.put(user.getUserAccount(), user);
         return id;
+    }
+
+    /**
+     * 获取用户关系状态变更时间线
+     */
+    public List<RelationshipLog> getRelationshipTimeline(Long userId) {
+        if (relationshipLogMapper == null || !databaseAvailable) {
+            return List.of();
+        }
+        try {
+            LambdaQueryWrapper<RelationshipLog> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(RelationshipLog::getUserId, userId)
+                    .orderByDesc(RelationshipLog::getCreateTime);
+            return relationshipLogMapper.selectList(wrapper);
+        } catch (Exception e) {
+            log.error("查询关系时间线失败: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    /**
+     * 记录关系状态变更
+     */
+    private void logRelationshipChange(Long userId, String oldStatus, String newStatus) {
+        if (relationshipLogMapper == null || !databaseAvailable) return;
+        if (newStatus.equals(oldStatus)) return;
+        try {
+            RelationshipLog logEntry = new RelationshipLog();
+            logEntry.setUserId(userId);
+            logEntry.setOldStatus(oldStatus);
+            logEntry.setNewStatus(newStatus);
+            logEntry.setCreateTime(new Date());
+            relationshipLogMapper.insert(logEntry);
+            log.info("用户 {} 关系状态变更: {} -> {}", userId, oldStatus, newStatus);
+        } catch (Exception e) {
+            log.warn("记录关系状态变更失败: {}", e.getMessage());
+        }
     }
 
     /**
