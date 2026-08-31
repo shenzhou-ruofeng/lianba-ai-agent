@@ -4,7 +4,8 @@ import cn.hutool.core.collection.CollUtil;
 import com.lianba.aiagent.advisor.MyLoggerAdvisor;
 import com.lianba.aiagent.advisor.ReReadingAdvisor;
 import com.lianba.aiagent.app.model.LoveReport;
-import com.lianba.aiagent.chatmemory.FileBasedChatMemoryRepository;
+import com.lianba.aiagent.chatmemory.DbBasedChatMemoryRepository;
+import com.lianba.aiagent.mapper.ChatMemoryMapper;
 import com.lianba.aiagent.rag.LoveAppContextualQueryAugmenterFactory;
 import com.lianba.aiagent.rag.LoveAppDocumentLoader;
 import com.lianba.aiagent.rag.LoveAppRagCustomAdvisorFactory;
@@ -85,14 +86,14 @@ public class LoveApp {
     /**
      * 初始化 ChatClient
      *
-     * @param dashscopeChatModel
+     * @param dashscopeChatModel 通义千问 ChatModel
+     * @param chatMemoryMapper   对话记忆 Mapper（数据库持久化）
      */
-    public LoveApp(ChatModel dashscopeChatModel) {
+    public LoveApp(ChatModel dashscopeChatModel, ChatMemoryMapper chatMemoryMapper) {
         this.chatModel = dashscopeChatModel;
-        // 初始化基于 Kryo 文件持久化的对话记忆（重启后同 chatId 上下文延续），保留消息窗口裁剪
-        String fileDir = System.getProperty("user.dir") + "/tmp/chat-memory";
+        // 初始化基于数据库持久化的对话记忆（重启后同 chatId 上下文延续），保留消息窗口裁剪
         MessageWindowChatMemory chatMemory = MessageWindowChatMemory.builder()
-                .chatMemoryRepository(new FileBasedChatMemoryRepository(fileDir))
+                .chatMemoryRepository(new DbBasedChatMemoryRepository(chatMemoryMapper))
                 .maxMessages(20)
                 .build();
         this.chatMemory = chatMemory;

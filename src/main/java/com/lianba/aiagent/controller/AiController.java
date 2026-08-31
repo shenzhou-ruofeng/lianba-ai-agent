@@ -10,8 +10,10 @@ import com.lianba.aiagent.common.ResultUtils;
 import com.lianba.aiagent.exception.ErrorCode;
 import com.lianba.aiagent.exception.ThrowUtils;
 import com.lianba.aiagent.model.vo.LoginUserVO;
+import com.lianba.aiagent.model.vo.LoveReportVO;
 import com.lianba.aiagent.service.AgentTaskService;
 import com.lianba.aiagent.service.LoveReportExportService;
+import com.lianba.aiagent.service.LoveReportService;
 import com.lianba.aiagent.service.MiMoVisionService;
 import com.lianba.aiagent.service.UserService;
 import jakarta.annotation.Resource;
@@ -57,6 +59,9 @@ public class AiController {
 
     @Resource
     private LoveReportExportService loveReportExportService;
+
+    @Resource
+    private LoveReportService loveReportService;
 
     @Resource
     private UserService userService;
@@ -157,14 +162,34 @@ public class AiController {
     /**
      * 生成恋爱报告（结构化输出，同步调用）
      * 基于当前会话的历史对话生成报告，返回 {title, suggestions} JSON
-     *
-     * @param message
-     * @param chatId
-     * @return
+     * 生成后自动保存到数据库
      */
     @GetMapping("/love_app/chat/report")
-    public LoveReport doChatWithLoveAppReport(String message, String chatId) {
-        return loveApp.doChatWithReport(message, chatId);
+    public LoveReportVO doChatWithLoveAppReport(String message, String chatId, HttpServletRequest request) {
+        LoginUserVO loginUser = userService.getLoginUser(request);
+        LoveReport report = loveApp.doChatWithReport(message, chatId);
+        // 自动保存到数据库
+        return loveReportService.saveReport(loginUser.getId(), chatId, report);
+    }
+
+    /**
+     * 查询当前用户的恋爱报告列表
+     */
+    @GetMapping("/love_app/report/list")
+    public BaseResponse<List<LoveReportVO>> listLoveReports(HttpServletRequest request) {
+        LoginUserVO loginUser = userService.getLoginUser(request);
+        return ResultUtils.success(loveReportService.listReports(loginUser.getId()));
+    }
+
+    /**
+     * 查询单个恋爱报告
+     */
+    @GetMapping("/love_app/report/detail")
+    public BaseResponse<LoveReportVO> getLoveReport(@RequestParam Long id, HttpServletRequest request) {
+        LoginUserVO loginUser = userService.getLoginUser(request);
+        LoveReportVO report = loveReportService.getReport(loginUser.getId(), id);
+        ThrowUtils.throwIf(report == null, ErrorCode.NOT_FOUND_ERROR, "报告不存在");
+        return ResultUtils.success(report);
     }
 
     /**

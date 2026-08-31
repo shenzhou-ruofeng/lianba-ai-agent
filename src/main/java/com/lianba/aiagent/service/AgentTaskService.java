@@ -2,6 +2,8 @@
 
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.lianba.aiagent.agent.AgentRunListener;
 import com.lianba.aiagent.agent.BaseAgent;
 import com.lianba.aiagent.agent.model.AgentTask;
@@ -9,13 +11,12 @@ import com.lianba.aiagent.agent.model.AgentTaskStatus;
 import com.lianba.aiagent.exception.BusinessException;
 import com.lianba.aiagent.exception.ErrorCode;
 import com.lianba.aiagent.exception.ThrowUtils;
+import com.lianba.aiagent.mapper.AgentTaskMapper;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
-import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -46,40 +47,29 @@ public class AgentTaskService implements AgentRunListener {
      */
     private final Map<String, BaseAgent> runningAgents = new ConcurrentHashMap<>();
 
-    private final JdbcTemplate jdbcTemplate;
+    private final AgentTaskMapper agentTaskMapper;
 
     private volatile boolean databaseAvailable = false;
 
-    public AgentTaskService(ObjectProvider<JdbcTemplate> jdbcTemplateProvider) {
-        this.jdbcTemplate = jdbcTemplateProvider.getIfAvailable();
+    public AgentTaskService(ObjectProvider<AgentTaskMapper> agentTaskMapperProvider) {
+        this.agentTaskMapper = agentTaskMapperProvider.getIfAvailable();
     }
 
     /**
-     * 启动时尝试初始化任务表；失败则降级为内存存储
+     * 启动时检测数据库是否可用；不可用则降级为内存存储
      */
     @PostConstruct
     public void init() {
-        if (jdbcTemplate == null) {
+        if (agentTaskMapper == null) {
             log.info("未配置数据源，智能体任务状态使用内存存储（重启后丢失）");
             return;
         }
         try {
-            jdbcTemplate.execute("""
-                    CREATE TABLE IF NOT EXISTS agent_task (
-                        task_id VARCHAR(64) PRIMARY KEY,
-                        user_id BIGINT,
-                        user_account VARCHAR(64),
-                        message VARCHAR(1000),
-                        status VARCHAR(16) NOT NULL,
-                        error_message VARCHAR(1000),
-                        create_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                        update_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-                    )
-                    """);
+            agentTaskMapper.selectCount(null);
             databaseAvailable = true;
-            log.info("任务表 agent_task 初始化完成，使用数据库记录任务状态");
+            log.info("数据库连接正常，使用 agent_task 表记录任务状态");
         } catch (Exception e) {
-            log.warn("任务表初始化失败，降级为内存存储: {}", e.getMessage());
+            log.warn("数据库不可用，降级为内存存储: {}", e.getMessage());
         }
     }
 
@@ -134,9 +124,7 @@ public class AgentTaskService implements AgentRunListener {
     public AgentTask getTask(String taskId) {
         if (databaseAvailable) {
             try {
-                List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                        "SELECT * FROM agent_task WHERE task_id = ?", taskId);
-                return rows.isEmpty() ? null : mapRowToTask(rows.get(0));
+                return agentTaskMapper.selectById(taskId);
             } catch (Exception e) {
                 log.error("查询任务失败: {}", e.getMessage());
                 return null;
@@ -151,9 +139,11 @@ public class AgentTaskService implements AgentRunListener {
     public List<AgentTask> listUserTasks(Long userId) {
         if (databaseAvailable) {
             try {
-                List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                        "SELECT * FROM agent_task WHERE user_id = ? ORDER BY create_time DESC LIMIT 20", userId);
-                return rows.stream().map(this::mapRowToTask).toList();
+                LambdaQueryWrapper<AgentTask> wrapper = new LambdaQueryWrapper<>();
+                wrapper.eq(AgentTask::getUserId, userId)
+                        .orderByDesc(AgentTask::getCreateTime)
+                        .last("LIMIT 20");
+                return agentTaskMapper.selectList(wrapper);
             } catch (Exception e) {
                 log.error("查询任务列表失败: {}", e.getMessage());
                 return List.of();
@@ -161,7 +151,7 @@ public class AgentTaskService implements AgentRunListener {
         }
         return memoryTaskStore.values().stream()
                 .filter(task -> userId != null && userId.equals(task.getUserId()))
-                .sorted(Comparator.comparing(AgentTask::getCreateTime).reversed())
+                .sorted(java.util.Comparator.comparing(AgentTask::getCreateTime).reversed())
                 .limit(20)
                 .toList();
     }
@@ -179,9 +169,7 @@ public class AgentTaskService implements AgentRunListener {
     private void saveTask(AgentTask task) {
         if (databaseAvailable) {
             try {
-                jdbcTemplate.update(
-                        "INSERT INTO agent_task (task_id, user_id, user_account, message, status) VALUES (?, ?, ?, ?, ?)",
-                        task.getTaskId(), task.getUserId(), task.getUserAccount(), task.getMessage(), task.getStatus());
+                agentTaskMapper.insert(task);
                 return;
             } catch (Exception e) {
                 log.error("保存任务记录失败，转存内存: {}", e.getMessage());
@@ -194,9 +182,12 @@ public class AgentTaskService implements AgentRunListener {
         String truncatedError = StrUtil.maxLength(errorMessage, MAX_MESSAGE_LENGTH);
         if (databaseAvailable) {
             try {
-                jdbcTemplate.update(
-                        "UPDATE agent_task SET status = ?, error_message = ?, update_time = CURRENT_TIMESTAMP WHERE task_id = ?",
-                        status.name(), truncatedError, taskId);
+                LambdaUpdateWrapper<AgentTask> wrapper = new LambdaUpdateWrapper<>();
+                wrapper.eq(AgentTask::getTaskId, taskId)
+                        .set(AgentTask::getStatus, status.name())
+                        .set(AgentTask::getErrorMessage, truncatedError)
+                        .set(AgentTask::getUpdateTime, new Date());
+                agentTaskMapper.update(null, wrapper);
                 return;
             } catch (Exception e) {
                 log.error("更新任务状态失败: {}", e.getMessage());
@@ -208,25 +199,5 @@ public class AgentTaskService implements AgentRunListener {
             task.setErrorMessage(truncatedError);
             task.setUpdateTime(new Date());
         }
-    }
-
-    private AgentTask mapRowToTask(Map<String, Object> row) {
-        AgentTask task = new AgentTask();
-        task.setTaskId((String) row.get("task_id"));
-        Object userId = row.get("user_id");
-        if (userId instanceof Number number) {
-            task.setUserId(number.longValue());
-        }
-        task.setUserAccount((String) row.get("user_account"));
-        task.setMessage((String) row.get("message"));
-        task.setStatus((String) row.get("status"));
-        task.setErrorMessage((String) row.get("error_message"));
-        if (row.get("create_time") instanceof java.sql.Timestamp createTime) {
-            task.setCreateTime(new Date(createTime.getTime()));
-        }
-        if (row.get("update_time") instanceof java.sql.Timestamp updateTime) {
-            task.setUpdateTime(new Date(updateTime.getTime()));
-        }
-        return task;
     }
 }
