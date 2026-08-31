@@ -1,0 +1,58 @@
+### CUSTOM ###
+/src/main/resources/application-local.yml
+tmp
+
+# 环境变量文件（含密钥，不入库；保留示例模板）
+.env
+.env.*
+!.env.example
+
+# 含密钥的项目配置文件（不入库）
+application-prod.yml
+# MCP 图片搜索服务配置（含真实 Pexels key，不入库；本地保留用于打包镜像）
+yu-image-search-mcp-server/src/main/resources/application.yml
+# MCP stdio 服务器配置（含真实高德 key，不入库；本地保留用于打包镜像）
+src/main/resources/mcp-servers.json
+
+# 部署目录中的构建产物（jar / dist 不入库，部署文档和 nginx 配置保留）
+deploy/backend/*.jar
+deploy/mcp-server/*.jar
+deploy/frontend/dist/
+
+# 压缩包归档文件（构建产物，不入库）
+*.zip
+*.rar
+
+HELP.md
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/

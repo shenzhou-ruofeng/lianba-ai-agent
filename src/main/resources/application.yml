@@ -1,0 +1,110 @@
+spring:
+  application:
+    name: yu-ai-agent
+  profiles:
+    active: local
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 20MB
+# 临时注释掉，便于大家开发调试和部署（实际填写 PgVector 数据库信息）
+#  datasource:
+#    url: xxx
+#    username: root
+#    password: 123456
+# 临时注释掉，便于大家开发调试和部署（实际填写邮箱 SMTP 信息，启用邮件发送工具）
+#  mail:
+#    host: smtp.qq.com
+#    port: 465
+#    username: xxx@qq.com
+#    password: xxx # SMTP 授权码，不是邮箱登录密码
+#    properties:
+#      mail:
+#        smtp:
+#          auth: true
+#          ssl:
+#            enable: true
+  ai:
+    dashscope:
+      # 真实密钥已配置在 application-prod.yml，本地开发可通过环境变量 DASHSCOPE_API_KEY 注入
+      api-key: ${DASHSCOPE_API_KEY:}
+      chat:
+        options:
+          model: qwen-plus
+    ollama:
+      base-url: http://localhost:11434
+      chat:
+        model: gemma3:1b
+# 临时注释掉，便于大家开发调试和部署（实际需要启动 MCP 服务）
+#    mcp:
+#      client:
+#        sse:
+#          connections:
+#            server1:
+#              url: http://localhost:8127
+#        stdio:
+#          servers-configuration: classpath:mcp-servers.json
+# 临时注释掉，便于大家开发调试和部署（实际需要启动 PgVector 数据库）
+#    vectorstore:
+#      pgvector:
+#        index-type: HNSW
+#        dimensions: 1536
+#        distance-type: COSINE_DISTANCE
+#        max-document-batch-size: 10000 # Optional: Maximum number of documents per batch
+server:
+  port: 8123
+  servlet:
+    context-path: /api
+# RAG 混合检索（向量语义检索 + 关键词全文检索，多数据源 RRF 融合）
+rag:
+  hybrid:
+    top-k: 5                   # 融合后返回的文档数量
+    rrf-k: 60                  # RRF 融合常数，越大各数据源排名差异被抹平得越多
+    similarity-threshold: 0.5  # 向量语义检索路的相似度阈值
+    pg-fulltext:
+      enabled: false           # 启用后增加 PostgreSQL 全文检索召回路（需配置 spring.datasource）
+      table: vector_store      # 全文检索的目标表（与 PgVectorStore 共用）
+# springdoc-openapi config
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+  api-docs:
+    path: /v3/api-docs
+  group-configs:
+    - group: 'default'
+      paths-to-match: '/**'
+      packages-to-scan: com.yupi.yuaiagent.controller
+# knife4j config
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
+# searchAPI
+search-api:
+  # 真实密钥已配置在 application-prod.yml，本地开发可通过环境变量 SEARCH_API_KEY 注入
+  api-key: ${SEARCH_API_KEY:}
+# 万相 wan2.7-image 图片生成/编辑（阿里云百炼 DashScope，复用 dashscope 密钥）
+wan-image:
+  base-url: https://dashscope.aliyuncs.com/api/v1
+  api-key: ${spring.ai.dashscope.api-key}
+  model: wan2.7-image
+# 阿里云对象存储 OSS（真实 AccessKey 已配置在 application-prod.yml，未配置密钥时自动降级为仅本地存储）
+oss:
+  client:
+    endpoint: ${OSS_ENDPOINT:oss-cn-guangzhou.aliyuncs.com}
+    access-key-id: ${OSS_ACCESS_KEY_ID:}
+    access-key-secret: ${OSS_ACCESS_KEY_SECRET:}
+    bucket: ${OSS_BUCKET:first-ai-agent}
+    # 可选：自定义访问域名（如 CDN/CNAME），为空时按 bucket + endpoint 自动拼接
+    host: ${OSS_HOST:}
+# MiMo 多模态
+mimo:
+  base-url: https://api.xiaomimimo.com/v1
+  # 真实密钥已配置在 application-prod.yml，本地开发可通过环境变量 MIMO_API_KEY 注入
+  api-key: ${MIMO_API_KEY:}
+# 修改日志级别，查看 Spring AI 更多调用细节
+logging:
+  level:
+    org.springframework.ai: DEBUG

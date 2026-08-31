@@ -1,0 +1,24 @@
+# 构建产物
+target/
+**/target/
+
+# 前端（由独立镜像构建，不进入后端上下文）
+yu-ai-agent-frontend/
+
+# MCP 服务（由独立镜像构建，不进入后端上下文）
+yu-image-search-mcp-server/
+
+# 依赖与缓存
+**/node_modules/
+
+# 运行时产物
+tmp/
+
+# 版本控制与 IDE
+.git/
+.idea/
+.vscode/
+*.iml
+
+# 其他
+*.rar

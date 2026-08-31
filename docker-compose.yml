@@ -1,0 +1,88 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: yu-ai-agent-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-yu_ai_agent}
+      POSTGRES_USER: ${DB_USERNAME:-shenzhou_ruofeng}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-your-db-password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-shenzhou_ruofeng} -d ${DB_NAME:-yu_ai_agent}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - yu-ai-agent-net
+
+  mcp-server:
+    build:
+      context: ./yu-image-search-mcp-server
+      dockerfile: Dockerfile
+    container_name: yu-ai-agent-mcp-server
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: sse
+      # Pexels key 已写入 mcp-server 的 application.yml（打包进镜像），此处无需注入
+    ports:
+      - "8127:8127"
+    healthcheck:
+      # corretto 基于 Amazon Linux，自带 bash，用 /dev/tcp 探测端口就绪
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/8127' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - yu-ai-agent-net
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: yu-ai-agent-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mcp-server:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      # 数据库指向 compose 内的 postgres 服务
+      DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-yu_ai_agent}
+      DB_USERNAME: ${DB_USERNAME:-shenzhou_ruofeng}
+      DB_PASSWORD: ${DB_PASSWORD:-your-db-password}
+      # MCP 服务指向 compose 内的 mcp-server 服务（客户端会自动追加 /sse）
+      MCP_SERVER1_URL: http://mcp-server:8127
+      # 大模型/解析服务密钥（DashScope/MinerU/MiMo/SearchAPI）已统一配置在 application-prod.yml（打包进镜像），此处无需注入
+    ports:
+      - "8123:8123"
+    volumes:
+      # 持久化解析产物（file/pdf 等）
+      - ./tmp:/app/tmp
+    networks:
+      - yu-ai-agent-net
+
+  frontend:
+    build:
+      context: ./yu-ai-agent-frontend
+      dockerfile: Dockerfile
+    container_name: yu-ai-agent-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    networks:
+      - yu-ai-agent-net
+
+volumes:
+  pgdata:
+
+networks:
+  yu-ai-agent-net:
+    driver: bridge
