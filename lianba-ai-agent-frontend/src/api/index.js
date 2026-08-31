@@ -353,6 +353,24 @@ export const updateUserNickname = async (userName) => {
   return res.data
 }
 
+// 更新用户画像（Onboarding 情感状态选择）
+export const updateUserProfile = async (relationshipStatus) => {
+  const res = await request.post('/user/update_profile', { relationshipStatus })
+  return res.data
+}
+
+// 查询当前用户的恋爱报告列表
+export const listLoveReports = async () => {
+  const res = await request.get('/ai/love_app/report/list')
+  return res.data
+}
+
+// 查询单个恋爱报告详情
+export const getLoveReport = async (id) => {
+  const res = await request.get('/ai/love_app/report/detail', { params: { id } })
+  return res.data
+}
+
 // 导出通用会话记录为文件并触发浏览器下载（format: 'pdf' | 'word' | 'md'）
 // messages: [{ role: 'user' | 'ai', content }]，与聊天记录系统会话数据兼容
 export const exportChatSession = async (title, messages, format) => {
@@ -427,6 +445,9 @@ export default {
   userLogout,
   getLoginUser,
   updateUserNickname,
+  updateUserProfile,
+  listLoveReports,
+  getLoveReport,
   exportChatSession,
   stopManusTask,
   listManusTasks,

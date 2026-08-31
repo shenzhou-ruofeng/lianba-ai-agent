@@ -34,6 +34,11 @@ public class LoginUserVO implements Serializable {
     private String userRole;
 
     /**
+     * 情感状态：single / dating / married（null 表示未设置）
+     */
+    private String relationshipStatus;
+
+    /**
      * 创建时间
      */
     private Date createTime;

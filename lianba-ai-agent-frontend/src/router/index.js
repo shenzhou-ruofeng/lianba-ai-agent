@@ -29,16 +29,7 @@ const routes = [
       requiresAuth: true
     }
   },
-  {
-    path: '/super-agent',
-    name: 'SuperAgent',
-    component: () => import('../views/SuperAgent.vue'),
-    meta: {
-      title: 'AI超级智能体 - 恋吧AI超级智能体应用平台',
-      description: 'AI超级智能体是恋吧AI超级智能体应用平台的全能助手，能解答各类专业问题，提供精准建议和解决方案',
-      requiresAuth: true
-    }
-  },
+
   {
     path: '/export',
     name: 'Export',
@@ -54,8 +45,18 @@ const routes = [
     name: 'Profile',
     component: () => import('../views/Profile.vue'),
     meta: {
-      title: '个人信息 - 恋吧AI超级智能体应用平台',
-      description: '查看和编辑你的恋吧AI超级智能体应用平台个人信息',
+      title: '个人信息 - 恋吧AI',
+      description: '查看和编辑你的恋吧AI个人信息',
+      requiresAuth: true
+    }
+  },
+  {
+    path: '/reports',
+    name: 'ReportHistory',
+    component: () => import('../views/ReportHistory.vue'),
+    meta: {
+      title: '恋爱报告历史 - 恋吧AI',
+      description: '查看 AI 为你生成的恋爱报告，支持 PDF / Word / Markdown 下载',
       requiresAuth: true
     }
   }

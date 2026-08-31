@@ -111,15 +111,35 @@
           </div>
         </div>
         
-        <!-- 生成的图片预览 + 下载 -->
+        <!-- 生成的图片预览 + 下载（支持原图 vs 生成图对比） -->
         <div v-else-if="msg.type === 'generated_image'" class="generated-image-wrapper">
           <div class="avatar ai-avatar">
             <AiAvatarFallback :type="aiType" />
           </div>
-          <div class="generated-image-card">
+          <!-- 对比模式：找到了前序用户消息中的引用图片 -->
+          <div v-if="findOriginalImage(index)" class="image-compare-card">
+            <div class="image-compare-title">🖼️ 原图 vs AI 生成</div>
+            <div class="image-compare-grid">
+              <div class="image-compare-side">
+                <span class="image-compare-label">原图</span>
+                <img :src="resolveImageUrl(findOriginalImage(index))" class="image-compare-img" alt="原图" @error="onImageLoadError" />
+              </div>
+              <div class="image-compare-side">
+                <span class="image-compare-label result-label">AI 生成</span>
+                <img :src="resolveImageUrl(msg.imageUrl)" class="image-compare-img" alt="AI生成" @error="onImageLoadError" />
+              </div>
+            </div>
+            <div class="image-compare-actions">
+              <a :href="resolveDownloadUrl(msg.imageUrl)" class="generated-image-download-btn" target="_blank" rel="noopener">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                下载生成图片
+              </a>
+            </div>
+          </div>
+          <!-- 普通模式：无原图对比 -->
+          <div v-else class="generated-image-card">
             <div class="generated-image-title">🖼️ AI 生成的图片</div>
             <img :src="resolveImageUrl(msg.imageUrl)" class="generated-image-preview" alt="AI生成的图片" @error="onImageLoadError" @load="e => e.target.style.display=''" />
-            <!-- 使用 ?download=true 服务端强制下载，解决跨域下 <a download> 属性被浏览器忽略的问题 -->
             <a :href="resolveDownloadUrl(msg.imageUrl)" class="generated-image-download-btn" target="_blank" rel="noopener">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               下载图片
@@ -272,6 +292,17 @@
       </div>
     </div>
 
+    <!-- 能力引导气泡（首次对话后展示，引导用户体验工具能力） -->
+    <div v-if="showCapabilityGuide && connectionStatus !== 'connecting'" class="capability-guide-bar">
+      <span class="guide-label">试试这些：</span>
+      <button
+        v-for="guide in capabilityGuides"
+        :key="guide.label"
+        class="guide-chip"
+        @click="clickCapabilityGuide(guide)"
+      >{{ guide.label }}</button>
+    </div>
+
     <!-- 输入区域 -->
     <div class="chat-input-container">
       <div v-if="uploadStatus" class="upload-status" :class="uploadStatus.type">
@@ -308,6 +339,16 @@
           <span v-else-if="doc.status === 'error'" class="doc-preview-status doc-status-error">解析失败</span>
           <button class="preview-remove-btn doc-remove-btn" @click="removeDoc(dIdx)" title="移除文档">×</button>
         </div>
+      </div>
+      <!-- 图片编辑快捷指令气泡（图片解析完成后展示） -->
+      <div v-if="imagePreviews.some(img => img.status === 'done')" class="image-quick-commands">
+        <span class="guide-label">快捷编辑：</span>
+        <button
+          v-for="cmd in imageQuickCommands"
+          :key="cmd.label"
+          class="quick-cmd-chip"
+          @click="clickImageQuickCommand(cmd)"
+        >{{ cmd.label }}</button>
       </div>
       <div class="chat-input">
         <button class="upload-btn" @click="triggerUpload" :disabled="connectionStatus === 'connecting'" title="上传文档到 RAG 知识库">
@@ -423,10 +464,34 @@ const props = defineProps({
   matchGender: {
     type: String,
     default: ''  // 对象推荐期望性别：'' 不限 / '男' / '女'
+  },
+  showCapabilityGuide: {
+    type: Boolean,
+    default: false  // 是否展示能力引导气泡（首次对话后展示）
   }
 })
 
-const emit = defineEmits(['send-message', 'generate-report', 'update:chatMode', 'update:matchGender', 'stop-generation'])
+const emit = defineEmits(['send-message', 'generate-report', 'update:chatMode', 'update:matchGender', 'stop-generation', 'quick-send'])
+
+// 能力引导气泡：点击后自动填入输入框并发送
+const capabilityGuides = [
+  { label: '📝 约会计划', text: '帮我做一份浪漫的约会计划，生成 PDF 文件' },
+  { label: '🖼️ 图片编辑', text: '帮我把上传的图片调成暖色调' },
+  { label: '💌 恋爱报告', text: '', action: 'report' },
+  { label: '🔍 联网搜索', text: '帮我搜索一下最近的恋爱心理学研究' }
+]
+
+const clickCapabilityGuide = (guide) => {
+  if (guide.action === 'report') {
+    emit('generate-report')
+    return
+  }
+  inputMessage.value = guide.text
+  nextTick(() => {
+    resizeInput()
+    sendMessage()
+  })
+}
 
 // 恋爱大师模式切换选项
 const chatModes = [
@@ -710,6 +775,34 @@ const onImageLoadError = (e) => {
       img.after(placeholder)
     }
   }
+}
+
+// 查找前序用户消息中的引用图片（用于图片编辑对比展示）
+const findOriginalImage = (currentIndex) => {
+  for (let i = currentIndex - 1; i >= Math.max(0, currentIndex - 10); i--) {
+    const msg = props.messages[i]
+    if (msg && msg.isUser && msg.quote && msg.quote.images && msg.quote.images.length > 0) {
+      const img = msg.quote.images[0]
+      return img.url || img.previewUrl || null
+    }
+  }
+  return null
+}
+
+// 图片编辑快捷指令（上传图片解析完成后展示）
+const imageQuickCommands = [
+  { label: '🌅 暖色调', text: '帮我把这张照片调成暖色调，营造温馨浪漫的氛围' },
+  { label: '🎨 卡通版', text: '帮我把这张照片变成卡通风格的插画' },
+  { label: '🏖️ 换背景', text: '帮我把这张照片的背景换成海边日落' },
+  { label: '✂️ 去背景', text: '帮我去掉这张照片的背景，变成透明底' }
+]
+
+const clickImageQuickCommand = (cmd) => {
+  inputMessage.value = cmd.text
+  nextTick(() => {
+    resizeInput()
+    sendMessage()
+  })
 }
 
 // 从 PDF 工具结果中提取下载 URL
@@ -2418,5 +2511,157 @@ onMounted(() => {
     max-width: 100%;
     max-height: 280px;
   }
+}
+
+/* 能力引导气泡栏 */
+.capability-guide-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #fff5f7, #fef9fc);
+  border-top: 1px solid #fdeef0;
+  flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.capability-guide-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.guide-label {
+  font-size: 12px;
+  color: #b98a96;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.guide-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 14px;
+  border-radius: 16px;
+  border: 1px solid #ffd6e0;
+  background: #fff;
+  font-size: 12px;
+  color: #e05575;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.guide-chip:hover {
+  background: #ffe9ee;
+  border-color: #ff8fab;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(255, 107, 139, 0.15);
+}
+
+/* 图片编辑对比卡片 */
+.image-compare-card {
+  flex: 1;
+  background: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 10px;
+  padding: 14px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.image-compare-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #495057;
+  margin-bottom: 12px;
+}
+
+.image-compare-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.image-compare-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.image-compare-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #888;
+  padding: 2px 10px;
+  border-radius: 10px;
+  background: #f5f5f5;
+}
+
+.image-compare-label.result-label {
+  background: #fff5f7;
+  color: #e05575;
+}
+
+.image-compare-img {
+  width: 100%;
+  max-width: 200px;
+  height: 160px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #eee;
+  background: #f9f9f9;
+}
+
+.image-compare-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+@media (max-width: 480px) {
+  .image-compare-grid {
+    grid-template-columns: 1fr;
+  }
+  .image-compare-img {
+    max-width: 100%;
+    max-height: 200px;
+  }
+}
+
+/* 图片编辑快捷指令气泡 */
+.image-quick-commands {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px 0;
+  background: white;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.image-quick-commands::-webkit-scrollbar {
+  display: none;
+}
+
+.quick-cmd-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 14px;
+  border: 1px solid #d4edda;
+  background: #f0fff4;
+  font-size: 12px;
+  color: #2d7a4f;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.quick-cmd-chip:hover {
+  background: #e0f7ea;
+  border-color: #a3d9b1;
+  transform: translateY(-1px);
 }
 </style> 

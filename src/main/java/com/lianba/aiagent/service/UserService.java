@@ -257,6 +257,46 @@ public class UserService {
     }
 
     /**
+     * 更新用户画像（情感状态），并同步 Session 登录态
+     *
+     * @param userId            用户 ID
+     * @param relationshipStatus 情感状态：single / dating / married
+     * @param request           HTTP 请求（用于更新 Session 登录态）
+     * @return 更新后的登录用户信息
+     */
+    public LoginUserVO updateUserProfile(long userId, String relationshipStatus, HttpServletRequest request) {
+        ThrowUtils.throwIf(StrUtil.isBlank(relationshipStatus), ErrorCode.PARAMS_ERROR, "情感状态不能为空");
+        ThrowUtils.throwIf(!java.util.List.of("single", "dating", "married").contains(relationshipStatus),
+                ErrorCode.PARAMS_ERROR, "情感状态值不合法");
+        User user = findById(userId);
+        ThrowUtils.throwIf(user == null, ErrorCode.NOT_FOUND_ERROR, "用户不存在");
+        if (databaseAvailable) {
+            try {
+                User updateUser = new User();
+                updateUser.setId(userId);
+                updateUser.setRelationshipStatus(relationshipStatus);
+                userMapper.updateById(updateUser);
+            } catch (Exception e) {
+                log.error("更新用户画像失败: {}", e.getMessage());
+                throw new BusinessException(ErrorCode.SYSTEM_ERROR, "保存失败，请稍后重试");
+            }
+        } else {
+            user.setRelationshipStatus(relationshipStatus);
+        }
+        // 同步 Session 登录态
+        LoginUserVO loginUserVO = toLoginUserVO(findById(userId));
+        request.getSession().setAttribute(UserConstant.USER_LOGIN_STATE, loginUserVO);
+        return loginUserVO;
+    }
+
+    /**
+     * 根据用户 ID 查询用户实体（供其他模块获取画像信息）
+     */
+    public User getUserById(long userId) {
+        return findById(userId);
+    }
+
+    /**
      * 用户注销：清除 Session 登录态
      */
     public boolean userLogout(HttpServletRequest request) {
@@ -276,6 +316,7 @@ public class UserService {
         loginUserVO.setUserAccount(user.getUserAccount());
         loginUserVO.setUserName(user.getUserName());
         loginUserVO.setUserRole(user.getUserRole());
+        loginUserVO.setRelationshipStatus(user.getRelationshipStatus());
         loginUserVO.setCreateTime(user.getCreateTime());
         return loginUserVO;
     }

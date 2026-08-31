@@ -92,13 +92,13 @@
                 </svg>
                 导出会话信息
               </router-link>
+              <router-link to="/reports" class="quick-btn">
+                <span aria-hidden="true">💌</span>
+                恋爱报告历史
+              </router-link>
               <router-link to="/love-master" class="quick-btn">
                 <span aria-hidden="true">♡</span>
                 去和恋爱大师聊聊
-              </router-link>
-              <router-link to="/super-agent" class="quick-btn">
-                <span aria-hidden="true">✦</span>
-                去和超级智能体聊聊
               </router-link>
             </div>
           </section>

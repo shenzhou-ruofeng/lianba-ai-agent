@@ -52,7 +52,6 @@
         <p class="empty-hint">先去与智能体对话，历史会话会自动出现在这里</p>
         <div class="empty-actions">
           <router-link to="/love-master" class="cta cta-primary">去和恋爱大师聊聊</router-link>
-          <router-link to="/super-agent" class="cta cta-ghost">去和超级智能体聊聊</router-link>
         </div>
       </div>
 

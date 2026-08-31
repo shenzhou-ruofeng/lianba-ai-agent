@@ -46,6 +46,11 @@ public class User implements Serializable {
     private String userRole;
 
     /**
+     * 情感状态：single / dating / married（Onboarding 选择，用于 Prompt 个性化）
+     */
+    private String relationshipStatus;
+
+    /**
      * 创建时间
      */
     private Date createTime;

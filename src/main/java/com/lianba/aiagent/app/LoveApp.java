@@ -6,10 +6,14 @@ import com.lianba.aiagent.advisor.ReReadingAdvisor;
 import com.lianba.aiagent.app.model.LoveReport;
 import com.lianba.aiagent.chatmemory.DbBasedChatMemoryRepository;
 import com.lianba.aiagent.mapper.ChatMemoryMapper;
+import com.lianba.aiagent.mapper.ChatSessionMapper;
+import com.lianba.aiagent.model.entity.ChatSession;
+import com.lianba.aiagent.model.entity.User;
 import com.lianba.aiagent.rag.LoveAppContextualQueryAugmenterFactory;
 import com.lianba.aiagent.rag.LoveAppDocumentLoader;
 import com.lianba.aiagent.rag.LoveAppRagCustomAdvisorFactory;
 import com.lianba.aiagent.rag.QueryRewriter;
+import com.lianba.aiagent.service.UserService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -62,6 +66,12 @@ public class LoveApp {
 
     // 工具调用管理器：用于手动控制工具执行流程，提升可观测性
     private final ToolCallingManager toolCallingManager = ToolCallingManager.builder().build();
+
+    @Resource
+    private ChatSessionMapper chatSessionMapper;
+
+    @Resource
+    private UserService userService;
 
     private static final String SYSTEM_PROMPT = """
             你是深耕恋爱心理领域的专家，同时也是一位贴心的生活助手。
@@ -551,9 +561,9 @@ public class LoveApp {
 
         CompletableFuture.runAsync(() -> {
             try {
-                // 1. 构建消息上下文：系统提示词 + 历史对话记忆 + 当前用户消息
+                // 1. 构建消息上下文：个性化系统提示词 + 历史对话记忆 + 当前用户消息
                 List<Message> messages = new ArrayList<>();
-                messages.add(new SystemMessage(SYSTEM_PROMPT));
+                messages.add(new SystemMessage(buildPersonalizedSystemPrompt(chatId)));
                 messages.addAll(chatMemory.get(chatId));
 
                 // 构建用户消息（如有图片则附加 URL 上下文）
@@ -672,6 +682,56 @@ public class LoveApp {
         sseEmitter.onCompletion(() -> log.info("[工具对话] chatId: {} SSE 连接完成", chatId));
 
         return sseEmitter;
+    }
+
+    /**
+     * 根据用户画像构建个性化系统提示词。
+     * 通过 chatId 反查会话 -> 用户 -> 情感状态，在基础 Prompt 后追加个性化段落。
+     * 查询失败时回退到基础 SYSTEM_PROMPT。
+     */
+    private String buildPersonalizedSystemPrompt(String chatId) {
+        try {
+            // 通过 chatId 查询会话获取 userId
+            com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ChatSession> wrapper =
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+            wrapper.eq(ChatSession::getSessionId, chatId).last("LIMIT 1");
+            ChatSession session = chatSessionMapper.selectOne(wrapper);
+            if (session == null || session.getUserId() == null) {
+                return SYSTEM_PROMPT;
+            }
+            // 查询用户画像
+            User user = userService.getUserById(session.getUserId());
+            if (user == null || user.getRelationshipStatus() == null || user.getRelationshipStatus().isBlank()) {
+                return SYSTEM_PROMPT;
+            }
+            // 根据情感状态追加个性化段落
+            String status = user.getRelationshipStatus();
+            String personalization = switch (status) {
+                case "single" -> """
+
+                    【用户画像】该用户当前处于单身状态。
+                    请重点关注：社交圈拓展、追求心仪对象的策略、自我提升与吸引力建设。
+                    开场时侧重询问是否有喜欢的人、社交圈情况，语气轻松鼓励。
+                    """;
+                case "dating" -> """
+
+                    【用户画像】该用户当前处于恋爱状态。
+                    请重点关注：沟通技巧、习惯差异磨合、感情升温与信任建立。
+                    开场时侧重询问恋爱中的困惑或矛盾，语气温柔有同理心。
+                    """;
+                case "married" -> """
+
+                    【用户画像】该用户当前处于已婚状态。
+                    请重点关注：家庭责任分工、婆媳/翁婿关系、婚姻生活保鲜。
+                    开场时侧重询问家庭生活中的烦恼，语气成熟稳重、理解包容。
+                    """;
+                default -> "";
+            };
+            return SYSTEM_PROMPT + personalization;
+        } catch (Exception e) {
+            log.warn("构建个性化 Prompt 失败，回退到基础 Prompt: {}", e.getMessage());
+            return SYSTEM_PROMPT;
+        }
     }
 
     /**

@@ -1,6 +1,30 @@
 <template>
   <div class="love-master-container">
     <AppHeader />
+
+    <!-- Onboarding 情感状态选择遮罩 -->
+    <div v-if="showOnboarding" class="onboarding-overlay">
+      <div class="onboarding-card">
+        <h2 class="onboarding-title">欢迎来到 AI 恋爱大师 ♡</h2>
+        <p class="onboarding-desc">请选择你当前的情感状态，我会为你提供更贴心的服务</p>
+        <div class="onboarding-cards">
+          <button
+            v-for="opt in relationshipOptions"
+            :key="opt.value"
+            class="onboarding-option"
+            :class="{ selected: selectedStatus === opt.value }"
+            @click="selectRelationshipStatus(opt.value)"
+            :disabled="savingStatus"
+          >
+            <span class="option-emoji">{{ opt.emoji }}</span>
+            <span class="option-label">{{ opt.label }}</span>
+            <span class="option-desc">{{ opt.desc }}</span>
+          </button>
+        </div>
+        <p v-if="savingStatus" class="onboarding-saving">保存中...</p>
+      </div>
+    </div>
+
     <div class="workspace">
       <!-- 会话侧边栏 -->
       <button class="sidebar-toggle" aria-label="打开会话列表" @click="sidebarOpen = true">
@@ -26,6 +50,7 @@
           :report-loading="reportLoading"
           :chat-mode="chatMode"
           :match-gender="matchGender"
+          :show-capability-guide="showCapabilityGuide"
           ai-type="love"
           @send-message="sendMessage"
           @stop-generation="stopGeneration"
@@ -45,7 +70,7 @@ import { useHead } from '@vueuse/head'
 import AppHeader from '../components/AppHeader.vue'
 import ChatRoom from '../components/ChatRoom.vue'
 import SessionSidebar from '../components/SessionSidebar.vue'
-import { chatWithLoveApp, chatWithLoveAppVision, matchWithLoveApp, generateLoveReport } from '../api'
+import { chatWithLoveApp, chatWithLoveAppVision, matchWithLoveApp, generateLoveReport, updateUserProfile } from '../api'
 import { useAuth } from '../composables/useAuth'
 import { useSessionStore } from '../composables/useSessionStore'
 
@@ -65,7 +90,7 @@ useHead({
 })
 
 const router = useRouter()
-const { refreshLoginUser } = useAuth()
+const { refreshLoginUser, loginUser } = useAuth()
 const {
   sessions,
   initSessions,
@@ -90,6 +115,46 @@ let eventSource = null
 // 工具步骤跟踪（融合超级智能体工具后，恋爱大师也展示工具调用过程）
 let currentToolStep = 0
 let currentToolCalls = []
+
+// Onboarding 情感状态选择
+const showOnboarding = ref(false)
+const selectedStatus = ref('')
+const savingStatus = ref(false)
+// 能力引导气泡：首次发送消息后展示（localStorage 持久化）
+const showCapabilityGuide = ref(false)
+const relationshipOptions = [
+  { value: 'single', emoji: '🌸', label: '单身', desc: '想拓展社交圈、追求心仪的人' },
+  { value: 'dating', emoji: '💕', label: '恋爱中', desc: '想改善沟通、解决恋爱中的小矛盾' },
+  { value: 'married', emoji: '💍', label: '已婚', desc: '想处理好家庭关系、保鲜婚姻生活' }
+]
+
+// 选择情感状态后保存并关闭 Onboarding
+const selectRelationshipStatus = async (status) => {
+  selectedStatus.value = status
+  savingStatus.value = true
+  try {
+    const res = await updateUserProfile(status)
+    if (res.code === 0 && res.data) {
+      // 同步全局登录态
+      Object.assign(loginUser.value, res.data)
+      showOnboarding.value = false
+      // 根据选择触发个性化开场白
+      const welcomeMap = {
+        single: '嗨，欢迎来到 AI 恋爱大师！🌸 我是你的情感伙伴，无论你是想拓展社交圈、还是正在为追求某个人而犯愁，都可以和我聊聊。你现在有喜欢的人吗？或者有什么社交方面的困扰？',
+        dating: '嗨，欢迎来到 AI 恋爱大师！💕 我是你的情感伙伴，恋爱中的甜蜜和烦恼都可以和我分享。你们最近遇到了什么困惑或矛盾吗？',
+        married: '嗨，欢迎来到 AI 恋爱大师！💍 我是你的情感伙伴，婚姻生活中的柴米油盐和人际关系都可以聊聊。最近有什么让你烦恼的事情吗？'
+      }
+      // 替换默认的欢迎消息
+      if (messages.value.length > 0 && messages.value[0].type === 'hint') {
+        messages.value[0].content = welcomeMap[status] || welcomeMap.single
+      }
+    }
+  } catch (e) {
+    console.error('保存情感状态失败:', e)
+  } finally {
+    savingStatus.value = false
+  }
+}
 
 // 添加消息到列表（同时持久化到当前会话，供历史恢复与会话导出）
 // 返回消息在会话存储中的索引，供流式输出精确更新
@@ -207,6 +272,12 @@ const sendMessage = (message, attachments = {}) => {
   const aiMessageIndex = messages.value.length
   // 创建空的AI回复消息并入库，返回其在会话存储中的精确索引
   const aiSessionIndex = addMessage('', false, 'ai-answer')
+
+  // 首次发送消息后展示能力引导气泡（仅展示一次）
+  if (!showCapabilityGuide.value && !localStorage.getItem('love_guide_shown')) {
+    showCapabilityGuide.value = true
+    localStorage.setItem('love_guide_shown', '1')
+  }
 
   connectionStatus.value = 'connecting'
   // 重置工具步骤跟踪
@@ -405,6 +476,11 @@ onMounted(async () => {
   } else {
     handleNewSession()
   }
+
+  // 新用户未选择情感状态时展示 Onboarding
+  if (user && !user.relationshipStatus) {
+    showOnboarding.value = true
+  }
 })
 
 // 组件销毁前关闭SSE连接
@@ -473,6 +549,122 @@ onBeforeUnmount(() => {
 
   .sidebar-mask {
     display: block;
+  }
+}
+
+/* Onboarding 情感状态选择遮罩 */
+.onboarding-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(38, 34, 28, 0.55);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.3s ease;
+}
+
+.onboarding-card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 40px 36px 32px;
+  max-width: 560px;
+  width: 90%;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18);
+  text-align: center;
+}
+
+.onboarding-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #e05575;
+  margin-bottom: 8px;
+}
+
+.onboarding-desc {
+  font-size: 0.92rem;
+  color: #888;
+  margin-bottom: 28px;
+}
+
+.onboarding-cards {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+}
+
+.onboarding-option {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 20px 12px;
+  border: 2px solid #f0e4e8;
+  border-radius: 16px;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.25s;
+}
+
+.onboarding-option:hover:not(:disabled) {
+  border-color: #ff8fab;
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(255, 107, 139, 0.15);
+}
+
+.onboarding-option.selected {
+  border-color: #ff6b8b;
+  background: linear-gradient(135deg, #fff5f7, #fff);
+  box-shadow: 0 8px 24px rgba(255, 107, 139, 0.2);
+}
+
+.onboarding-option:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.option-emoji {
+  font-size: 2rem;
+}
+
+.option-label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.option-desc {
+  font-size: 0.78rem;
+  color: #999;
+  line-height: 1.3;
+}
+
+.onboarding-saving {
+  margin-top: 16px;
+  font-size: 0.85rem;
+  color: #aaa;
+}
+
+@media (max-width: 480px) {
+  .onboarding-card {
+    padding: 28px 18px 24px;
+  }
+  .onboarding-cards {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .onboarding-option {
+    flex-direction: row;
+    padding: 14px 16px;
+    gap: 12px;
+  }
+  .option-emoji {
+    font-size: 1.5rem;
+  }
+  .option-desc {
+    display: none;
   }
 }
 </style>

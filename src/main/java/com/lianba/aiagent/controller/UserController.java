@@ -4,6 +4,7 @@ import com.lianba.aiagent.common.BaseResponse;
 import com.lianba.aiagent.common.ResultUtils;
 import com.lianba.aiagent.model.dto.SendCodeDTO;
 import com.lianba.aiagent.model.dto.UpdateNicknameDTO;
+import com.lianba.aiagent.model.dto.UpdateUserProfileDTO;
 import com.lianba.aiagent.model.dto.UserLoginDTO;
 import com.lianba.aiagent.model.dto.UserRegisterDTO;
 import com.lianba.aiagent.model.vo.LoginUserVO;
@@ -73,6 +74,17 @@ public class UserController {
                                                     HttpServletRequest request) {
         LoginUserVO loginUser = userService.getLoginUser(request);
         LoginUserVO updated = userService.updateUserNickname(loginUser.getId(), updateDTO.getUserName(), request);
+        return ResultUtils.success(updated);
+    }
+
+    /**
+     * 更新用户画像（Onboarding 情感状态选择）
+     */
+    @PostMapping("/update_profile")
+    public BaseResponse<LoginUserVO> updateProfile(@RequestBody UpdateUserProfileDTO updateDTO,
+                                                   HttpServletRequest request) {
+        LoginUserVO loginUser = userService.getLoginUser(request);
+        LoginUserVO updated = userService.updateUserProfile(loginUser.getId(), updateDTO.getRelationshipStatus(), request);
         return ResultUtils.success(updated);
     }
 
