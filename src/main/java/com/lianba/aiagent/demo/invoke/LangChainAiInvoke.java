@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.demo.invoke;
+package com.lianba.aiagent.demo.invoke;
 
 import dev.langchain4j.community.model.dashscope.QwenChatModel;
 import dev.langchain4j.model.chat.ChatLanguageModel;

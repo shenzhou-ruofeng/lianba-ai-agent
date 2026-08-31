@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.controller;
+package com.lianba.aiagent.controller;
 
 import cn.hutool.core.util.StrUtil;
 import com.lianba.aiagent.constant.FileConstant;

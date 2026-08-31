@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.tools;
+package com.lianba.aiagent.tools;
 
 import org.springframework.ai.tool.annotation.Tool;
 

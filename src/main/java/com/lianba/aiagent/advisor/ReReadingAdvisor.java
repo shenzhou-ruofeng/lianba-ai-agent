@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.advisor;
+package com.lianba.aiagent.advisor;
 
 import org.springframework.ai.chat.client.ChatClientRequest;
 import org.springframework.ai.chat.client.ChatClientResponse;

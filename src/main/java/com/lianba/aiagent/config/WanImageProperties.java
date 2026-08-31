@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.config;
+package com.lianba.aiagent.config;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;

@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.app;
+package com.lianba.aiagent.app;
 
 import cn.hutool.core.collection.CollUtil;
 import com.lianba.aiagent.advisor.MyLoggerAdvisor;
@@ -37,11 +37,17 @@ import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.stereotype.Component;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Component
@@ -58,14 +64,27 @@ public class LoveApp {
     private final ToolCallingManager toolCallingManager = ToolCallingManager.builder().build();
 
     private static final String SYSTEM_PROMPT = """
-            你是深耕恋爱心理领域的专家。
+            你是深耕恋爱心理领域的专家，同时也是一位贴心的生活助手。
             开场向用户表明身份，告知用户可倾诉恋爱难题，开场白中不要推荐课程。
             围绕单身、恋爱、已婚三种状态提问：
             - 单身状态询问社交圈拓展及追求心仪对象的困扰；
             - 恋爱状态询问沟通、习惯差异引发的矛盾；
             - 已婚状态询问家庭责任与亲属关系处理的问题。
             引导用户详述事情经过、对方反应及自身想法，以便给出专属解决方案。
-            不要提及"知识库""检索""参考资料""文档"等字眼，直接自然地给出建议。
+            不要提及“知识库”“检索”“参考资料”“文档”等字眼，直接自然地给出建议。
+                
+            除了情感咨询，你还可以帮用户处理恋爱生活中的实际任务。当用户提出以下类型的需求时，请主动调用相应工具：
+            - 约会规划（如“帮我做一份约会计划”）：调用搜索和 PDF 生成工具
+            - 图片创作（如“画一张情侣头像”“帮我把这张照片调成暖色调”）：调用图片生成工具
+            - 信息检索（如“附近有什么好的餐厅”）：调用联网搜索工具
+            - 文档处理（如“帮我写一封信”）：调用文件操作和邮件工具
+                
+            使用工具时注意：
+            - 用温暖、有同理心的语气包装工具结果，不要机械地返回原始数据
+            - 生成图片时，根据用户描述构造详细的中文或英文 prompt
+            - 如果用户上传图片并想修改，将图片 URL 作为 referenceImageUrl 参数传入
+            - 生成 PDF 或文件后，用友好的语言告知用户并引导下载
+                
             关于课程推荐：只有当上下文资料或课程清单中明确包含课程名称和超链接时，才可以推荐。
             推荐时必须使用 Markdown 链接格式输出：推荐课程：[《课程名》](链接)。
             课程名和链接必须与资料/清单中完全一致，逐字复制，禁止编造课程名、禁止修改链接地址、
@@ -510,5 +529,276 @@ public class LoveApp {
         String content = chatResponse.getResult().getOutput().getText();
         log.info("content: {}", content);
         return content;
+    }
+
+    // ========== 工具调用流式对话（融合超级智能体工具能力） ==========
+
+    @Resource
+    private Executor agentTaskExecutor;
+
+    /**
+     * 带工具调用的流式对话（SSE），融合超级智能体工具能力到恋爱大师。
+     * 手动控制工具执行流程，通过 SSE 实时推送工具调用步骤和结果给前端。
+     * 支持可选的图片 URL 列表（图片编辑/理解场景）。
+     *
+     * @param message    用户消息
+     * @param chatId     会话 ID
+     * @param imageUrls  用户上传的图片 URL 列表（可为 null）
+     * @return SseEmitter 流式响应
+     */
+    public SseEmitter doChatWithToolsStream(String message, String chatId, List<String> imageUrls) {
+        SseEmitter sseEmitter = new SseEmitter(300000L);
+
+        CompletableFuture.runAsync(() -> {
+            try {
+                // 1. 构建消息上下文：系统提示词 + 历史对话记忆 + 当前用户消息
+                List<Message> messages = new ArrayList<>();
+                messages.add(new SystemMessage(SYSTEM_PROMPT));
+                messages.addAll(chatMemory.get(chatId));
+
+                // 构建用户消息（如有图片则附加 URL 上下文）
+                String userText = message;
+                if (imageUrls != null && !imageUrls.isEmpty()) {
+                    userText += "\n\n[用户上传的图片地址]\n" + String.join("\n", imageUrls)
+                            + "\n（如果用户要求基于上传图片修改/重绘/生成新图，请调用 generateImage 工具并将上述图片地址作为 referenceImageUrl 参数传入）";
+                }
+                UserMessage userMessage = new UserMessage(userText);
+                messages.add(userMessage);
+                chatMemory.add(chatId, userMessage);
+
+                // 2. 通知前端：正在思考
+                sendSse(sseEmitter, buildStatusJson("thinking", "正在思考中..."));
+
+                // 3. 调用模型（禁用内置工具执行，手动控制流程）
+                ChatOptions chatOptions = ToolCallingChatOptions.builder()
+                        .toolCallbacks(allTools)
+                        .internalToolExecutionEnabled(false)
+                        .build();
+                Prompt prompt = new Prompt(messages, chatOptions);
+                ChatResponse chatResponse = chatModel.call(prompt);
+
+                // 4. 工具调用循环
+                int round = 0;
+                List<String[]> generatedFiles = new ArrayList<>();
+                while (chatResponse.hasToolCalls()) {
+                    round++;
+                    AssistantMessage assistantMessage = chatResponse.getResult().getOutput();
+
+                    // 发送工具调用信息
+                    for (AssistantMessage.ToolCall toolCall : assistantMessage.getToolCalls()) {
+                        sendSse(sseEmitter, buildToolCallJson(round, toolCall.name(), toolCall.arguments()));
+                    }
+
+                    // 发送状态：正在执行工具
+                    if (!assistantMessage.getToolCalls().isEmpty()) {
+                        String firstTool = assistantMessage.getToolCalls().get(0).name();
+                        sendSse(sseEmitter, buildStatusJson("executing_tool", getToolStatusMessage(firstTool)));
+                    }
+
+                    // 执行工具
+                    long toolStart = System.currentTimeMillis();
+                    ToolExecutionResult toolExecutionResult = toolCallingManager.executeToolCalls(prompt, chatResponse);
+                    long toolCost = System.currentTimeMillis() - toolStart;
+
+                    ToolResponseMessage toolResponseMessage =
+                            (ToolResponseMessage) CollUtil.getLast(toolExecutionResult.conversationHistory());
+
+                    // 发送工具执行结果
+                    for (ToolResponseMessage.ToolResponse response : toolResponseMessage.getResponses()) {
+                        log.info("[工具执行] chatId: {}, 工具 {} 执行完成, 耗时: {} ms", chatId, response.name(), toolCost);
+                        sendSse(sseEmitter, buildToolResultJson(round, response.name(), response.responseData()));
+                        // 收集生成的文件
+                        collectGeneratedFile(response.name(), response.responseData(), generatedFiles);
+                        // 如果生成了图片，发送图片预览事件
+                        if ("generateImage".equals(response.name())) {
+                            sendGeneratedImageIfPresent(response.responseData(), sseEmitter);
+                        }
+                    }
+
+                    // returnDirect = true：工具结果直接返回，不再调用模型
+                    if (toolExecutionResult.returnDirect()) {
+                        String directResult = toolResponseMessage.getResponses().stream()
+                                .map(ToolResponseMessage.ToolResponse::responseData)
+                                .collect(Collectors.joining("\n"));
+                        AssistantMessage directMsg = new AssistantMessage(directResult);
+                        chatMemory.add(chatId, directMsg);
+                        // 发送文件列表
+                        if (!generatedFiles.isEmpty()) {
+                            sendSse(sseEmitter, buildFilesJson(generatedFiles));
+                        }
+                        sendSse(sseEmitter, "[DONE]");
+                        sseEmitter.complete();
+                        return;
+                    }
+
+                    // 将工具结果回喂模型，继续下一轮推理
+                    prompt = new Prompt(toolExecutionResult.conversationHistory(), chatOptions);
+                    chatResponse = chatModel.call(prompt);
+                }
+
+                // 5. 模型不再调用工具，发送最终文本回复（逐块流式推送）
+                AssistantMessage finalMessage = chatResponse.getResult().getOutput();
+                String content = finalMessage.getText();
+                chatMemory.add(chatId, finalMessage);
+                log.info("[工具对话] chatId: {}, 共 {} 轮工具调用, 最终回复长度: {}", chatId, round, content != null ? content.length() : 0);
+
+                if (content != null && !content.isEmpty()) {
+                    sendSse(sseEmitter, buildTextJson(round, content));
+                }
+
+                // 发送生成的文件列表
+                if (!generatedFiles.isEmpty()) {
+                    sendSse(sseEmitter, buildFilesJson(generatedFiles));
+                }
+
+                sendSse(sseEmitter, "[DONE]");
+                sseEmitter.complete();
+            } catch (Exception e) {
+                log.error("[工具对话] chatId: {} 异常", chatId, e);
+                try {
+                    sendSse(sseEmitter, buildTextJson(0, "抱歉，处理过程中出现了异常：" + e.getMessage()));
+                    sendSse(sseEmitter, "[DONE]");
+                    sseEmitter.complete();
+                } catch (Exception ex) {
+                    sseEmitter.completeWithError(ex);
+                }
+            }
+        }, agentTaskExecutor);
+
+        sseEmitter.onTimeout(() -> {
+            log.warn("[工具对话] chatId: {} SSE 连接超时", chatId);
+            sseEmitter.complete();
+        });
+        sseEmitter.onCompletion(() -> log.info("[工具对话] chatId: {} SSE 连接完成", chatId));
+
+        return sseEmitter;
+    }
+
+    /**
+     * 安全发送 SSE 消息
+     */
+    private void sendSse(SseEmitter sseEmitter, String data) {
+        try {
+            sseEmitter.send(data);
+        } catch (IOException e) {
+            log.warn("SSE 发送失败", e);
+        }
+    }
+
+    private String escapeJson(String s) {
+        if (s == null) return "";
+        return s.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
+    }
+
+    private String buildStatusJson(String status, String message) {
+        return "{\"type\":\"status\",\"status\":\"" + escapeJson(status)
+                + "\",\"message\":\"" + escapeJson(message) + "\"}";
+    }
+
+    private String buildToolCallJson(int step, String toolName, String arguments) {
+        return "{\"type\":\"tool_call\",\"step\":" + step
+                + ",\"toolName\":\"" + escapeJson(toolName) + "\""
+                + ",\"arguments\":\"" + escapeJson(arguments) + "\"}";
+    }
+
+    private String buildToolResultJson(int step, String toolName, String result) {
+        return "{\"type\":\"tool_result\",\"step\":" + step
+                + ",\"toolName\":\"" + escapeJson(toolName) + "\""
+                + ",\"result\":\"" + escapeJson(result) + "\"}";
+    }
+
+    private String buildTextJson(int step, String content) {
+        return "{\"type\":\"text\",\"step\":" + step
+                + ",\"content\":\"" + escapeJson(content) + "\"}";
+    }
+
+    private String buildFilesJson(List<String[]> files) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\"type\":\"files\",\"files\":[");
+        for (int i = 0; i < files.size(); i++) {
+            String[] f = files.get(i);
+            if (i > 0) sb.append(",");
+            sb.append("{\"name\":\"").append(escapeJson(f[0])).append("\",\"")
+                    .append("url\":\"").append(escapeJson(f[1])).append("\",\"")
+                    .append("type\":\"").append(escapeJson(f[2])).append("\"}");
+        }
+        sb.append("]}");
+        return sb.toString();
+    }
+
+    /**
+     * 从工具执行结果中识别生成的可下载文件并收集
+     */
+    private void collectGeneratedFile(String toolName, String result, List<String[]> generatedFiles) {
+        if (toolName == null || result == null) return;
+        String name = null, url = null, type = null;
+        if ("generatePDF".equals(toolName) && result.contains("PDF generated successfully")) {
+            Matcher m = Pattern.compile("\\[Download: ([^\\s\\]]+)\\]").matcher(result);
+            if (m.find()) {
+                url = m.group(1);
+                name = url.replaceAll("^.*/", "");
+                int qi = name.indexOf('?');
+                if (qi >= 0) name = name.substring(0, qi);
+                type = "pdf";
+            }
+        } else if ("writeFile".equals(toolName) && result.contains("File written successfully")) {
+            Matcher m = Pattern.compile("File written successfully to:\\s*(.+)").matcher(result);
+            if (m.find()) {
+                name = m.group(1).trim().replaceAll("^.*[\\\\/]", "");
+                url = "/api/files/download/file/" + name;
+                type = "file";
+            }
+        }
+        if (name != null && url != null) {
+            for (String[] existing : generatedFiles) {
+                if (existing[1].equals(url)) return;
+            }
+            generatedFiles.add(new String[]{name, url, type});
+        }
+    }
+
+    /**
+     * 从 generateImage 工具结果中提取图片 URL 并发送 SSE 预览事件
+     */
+    private void sendGeneratedImageIfPresent(String result, SseEmitter sseEmitter) {
+        String imageUrl = null;
+        Matcher mLocal = Pattern.compile("下载地址：(/api/files/download/image/[^\\s\\\\\"'`]+)").matcher(result);
+        if (mLocal.find()) {
+            imageUrl = stripTrailingChars(mLocal.group(1));
+        } else {
+            Matcher m = Pattern.compile("下载地址：(https?://[^\\s\\\\\"'`]+)").matcher(result);
+            if (m.find()) imageUrl = stripTrailingChars(m.group(1));
+        }
+        if (imageUrl != null) {
+            sendSse(sseEmitter, "{\"type\":\"generated_image\",\"url\":\"" + escapeJson(imageUrl) + "\"}");
+        }
+    }
+
+    private String stripTrailingChars(String url) {
+        if (url == null) return null;
+        while (!url.isEmpty()) {
+            char last = url.charAt(url.length() - 1);
+            if (last == '"' || last == '\'' || last == '`' || last == ')' || last == ']'
+                    || last == '}' || last == ',' || last == ';' || last == '。' || last == '.') {
+                url = url.substring(0, url.length() - 1);
+            } else break;
+        }
+        return url;
+    }
+
+    private String getToolStatusMessage(String toolName) {
+        return switch (toolName) {
+            case "generateImage" -> "正在生成图片...";
+            case "searchWeb" -> "正在搜索网页...";
+            case "webScraping" -> "正在抓取网页内容...";
+            case "generatePDF" -> "正在生成 PDF 文件...";
+            case "writeFile" -> "正在写入文件...";
+            case "sendEmail" -> "正在发送邮件...";
+            default -> "正在执行 " + toolName + "...";
+        };
     }
 }

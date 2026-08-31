@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.agent;
+package com.lianba.aiagent.agent;
 
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Assertions;

@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.demo.rag;
+package com.lianba.aiagent.demo.rag;
 
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Assertions;

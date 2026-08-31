@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.manager;
+package com.lianba.aiagent.manager;
 
 import cn.hutool.core.util.StrUtil;
 import com.aliyun.oss.OSS;

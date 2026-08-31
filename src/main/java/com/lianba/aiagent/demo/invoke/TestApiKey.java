@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.demo.invoke;
+package com.lianba.aiagent.demo.invoke;
 
 /**
  * 仅用于测试获取 API Key

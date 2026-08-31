@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.agent;
+package com.lianba.aiagent.agent;
 
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;

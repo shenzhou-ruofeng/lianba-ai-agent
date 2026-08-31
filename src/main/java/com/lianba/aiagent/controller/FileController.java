@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.controller;
+package com.lianba.aiagent.controller;
 
 import com.lianba.aiagent.constant.FileConstant;
 import jakarta.servlet.http.HttpServletRequest;

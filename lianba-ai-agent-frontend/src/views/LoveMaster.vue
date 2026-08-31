@@ -45,7 +45,7 @@ import { useHead } from '@vueuse/head'
 import AppHeader from '../components/AppHeader.vue'
 import ChatRoom from '../components/ChatRoom.vue'
 import SessionSidebar from '../components/SessionSidebar.vue'
-import { chatWithLoveApp, matchWithLoveApp, generateLoveReport } from '../api'
+import { chatWithLoveApp, chatWithLoveAppVision, matchWithLoveApp, generateLoveReport } from '../api'
 import { useAuth } from '../composables/useAuth'
 import { useSessionStore } from '../composables/useSessionStore'
 
@@ -87,6 +87,9 @@ const chatMode = ref('chat')
 const matchGender = ref('')
 const sidebarOpen = ref(false)
 let eventSource = null
+// 工具步骤跟踪（融合超级智能体工具后，恋爱大师也展示工具调用过程）
+let currentToolStep = 0
+let currentToolCalls = []
 
 // 添加消息到列表（同时持久化到当前会话，供历史恢复与会话导出）
 // 返回消息在会话存储中的索引，供流式输出精确更新
@@ -146,7 +149,19 @@ const closeEventSource = () => {
     eventSource.close()
     eventSource = null
   }
+  currentToolStep = 0
+  currentToolCalls = []
   connectionStatus.value = 'disconnected'
+}
+
+// 添加工具步骤消息（可折叠展示工具调用过程）
+const addToolStepMessage = (step, toolCalls) => {
+  const existingIndex = messages.value.findLastIndex(m => m.type === 'tool_step' && m.step === step)
+  if (existingIndex >= 0) {
+    messages.value[existingIndex].toolCalls = [...toolCalls]
+  } else {
+    addMessage('', false, 'tool_step', { step, toolCalls: [...toolCalls] })
+  }
 }
 
 // 发送消息（支持图片/文档附件，附件已在待上传区解析完成）
@@ -194,38 +209,124 @@ const sendMessage = (message, attachments = {}) => {
   const aiSessionIndex = addMessage('', false, 'ai-answer')
 
   connectionStatus.value = 'connecting'
-  // 按模式分流：对象推荐走候选人知识库推荐接口，否则走普通 RAG 咨询接口
-  eventSource = chatMode.value === 'match'
-    ? matchWithLoveApp(outboundMessage, chatId.value, matchGender.value)
-    : chatWithLoveApp(outboundMessage, chatId.value)
+  // 重置工具步骤跟踪
+  currentToolStep = 0
+  currentToolCalls = []
 
-  // 监听SSE消息
-  eventSource.onmessage = (event) => {
-    const data = event.data
-    if (data && data !== '[DONE]') {
-      // 更新最新的AI消息内容，而不是创建新消息（按精确索引更新，避免覆盖用户消息）
-      if (aiMessageIndex < messages.value.length) {
-        messages.value[aiMessageIndex].content += data
-        patchMessageAt(chatId.value, aiSessionIndex, { content: messages.value[aiMessageIndex].content })
+  // 按模式分流：对象推荐走候选人知识库推荐接口（纯文本 SSE），其他走工具调用接口（JSON SSE）
+  if (chatMode.value === 'match') {
+    // === 对象推荐模式：纯文本流式（保持原有逻辑） ===
+    eventSource = matchWithLoveApp(outboundMessage, chatId.value, matchGender.value)
+    eventSource.onmessage = (event) => {
+      const data = event.data
+      if (data && data !== '[DONE]') {
+        if (aiMessageIndex < messages.value.length) {
+          messages.value[aiMessageIndex].content += data
+          patchMessageAt(chatId.value, aiSessionIndex, { content: messages.value[aiMessageIndex].content })
+        }
+      }
+      if (data === '[DONE]') {
+        connectionStatus.value = 'disconnected'
+        eventSource.close()
       }
     }
-
-    if (data === '[DONE]') {
-      connectionStatus.value = 'disconnected'
+    eventSource.onerror = (error) => {
+      if (eventSource.readyState === EventSource.CLOSED || connectionStatus.value === 'disconnected') {
+        connectionStatus.value = 'disconnected'
+        eventSource.close()
+        return
+      }
+      console.error('SSE Error:', error)
+      connectionStatus.value = 'error'
+      eventSource.close()
+    }
+  } else if (images.length > 0) {
+    // === 带图片的工具调用模式：POST + JSON SSE ===
+    const uploadedImageUrls = images.map(img => img.url).filter(u => u)
+    eventSource = chatWithLoveAppVision(
+      outboundMessage, chatId.value, uploadedImageUrls,
+      (data) => handleToolsSseMessage(data, aiMessageIndex, aiSessionIndex),
+      (error) => {
+        console.error('Vision SSE Error:', error)
+        connectionStatus.value = 'disconnected'
+        if (eventSource) eventSource.close()
+      }
+    )
+  } else {
+    // === 纯文本工具调用模式：GET + JSON SSE ===
+    eventSource = chatWithLoveApp(outboundMessage, chatId.value)
+    eventSource.onmessage = (event) => {
+      handleToolsSseMessage(event.data, aiMessageIndex, aiSessionIndex)
+      if (event.data === '[DONE]') {
+        connectionStatus.value = 'disconnected'
+        eventSource.close()
+      }
+    }
+    eventSource.onerror = (error) => {
+      if (eventSource.readyState === EventSource.CLOSED || connectionStatus.value === 'disconnected') {
+        connectionStatus.value = 'disconnected'
+        eventSource.close()
+        return
+      }
+      console.error('SSE Error:', error)
+      connectionStatus.value = 'error'
       eventSource.close()
     }
   }
+}
 
-  // 监听SSE错误（流正常结束时也会触发 onerror，需静默处理）
-  eventSource.onerror = (error) => {
-    if (eventSource.readyState === EventSource.CLOSED || connectionStatus.value === 'disconnected') {
-      connectionStatus.value = 'disconnected'
-      eventSource.close()
-      return
+/**
+ * 处理工具调用 SSE 的 JSON 消息（复用超级智能体的消息格式）
+ * 支持：tool_call / tool_result / text / generated_image / files / status
+ */
+const handleToolsSseMessage = (rawData, aiMessageIndex, aiSessionIndex) => {
+  if (!rawData || rawData === '[DONE]') return
+
+  let parsed = null
+  try {
+    if (rawData.startsWith('{')) parsed = JSON.parse(rawData)
+  } catch (e) { /* 不是 JSON，忽略 */ }
+
+  if (!parsed || !parsed.type) return
+
+  if (parsed.type === 'tool_call') {
+    if (parsed.step !== currentToolStep) {
+      if (currentToolCalls.length > 0) addToolStepMessage(currentToolStep, currentToolCalls)
+      currentToolStep = parsed.step
+      currentToolCalls = []
     }
-    console.error('SSE Error:', error)
-    connectionStatus.value = 'error'
-    eventSource.close()
+    currentToolCalls.push({ toolName: parsed.toolName || '未知工具', arguments: parsed.arguments || '', result: null })
+  } else if (parsed.type === 'tool_result') {
+    if (currentToolCalls.length > 0) {
+      const lastCall = currentToolCalls[currentToolCalls.length - 1]
+      if (lastCall && !lastCall.result) lastCall.result = parsed.result || ''
+      addToolStepMessage(currentToolStep, currentToolCalls)
+    }
+  } else if (parsed.type === 'text') {
+    // 保存之前的工具步骤
+    if (currentToolCalls.length > 0) {
+      addToolStepMessage(currentToolStep, currentToolCalls)
+      currentToolCalls = []
+    }
+    const content = parsed.content || ''
+    if (content && aiMessageIndex < messages.value.length) {
+      messages.value[aiMessageIndex].content += content
+      patchMessageAt(chatId.value, aiSessionIndex, { content: messages.value[aiMessageIndex].content })
+    }
+  } else if (parsed.type === 'generated_image') {
+    if (currentToolCalls.length > 0) {
+      addToolStepMessage(currentToolStep, currentToolCalls)
+      currentToolCalls = []
+    }
+    if (parsed.url) addMessage('', false, 'generated_image', { imageUrl: parsed.url })
+  } else if (parsed.type === 'files') {
+    if (currentToolCalls.length > 0) {
+      addToolStepMessage(currentToolStep, currentToolCalls)
+      currentToolCalls = []
+    }
+    if (parsed.files && parsed.files.length > 0) addMessage('', false, 'file-list', { files: parsed.files })
+  } else if (parsed.type === 'status') {
+    // 状态更新（正在思考/正在执行工具等），暂不展示
   }
 }
 

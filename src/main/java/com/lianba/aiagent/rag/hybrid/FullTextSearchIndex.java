@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.rag.hybrid;
+package com.lianba.aiagent.rag.hybrid;
 
 import org.springframework.ai.document.Document;
 

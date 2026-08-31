@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.tools;
+package com.lianba.aiagent.tools;
 
 import cn.hutool.core.io.FileUtil;
 import com.itextpdf.io.image.ImageData;

@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.constant;
+package com.lianba.aiagent.constant;
 
 /**
  * 用户相关常量

@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.controller;
+package com.lianba.aiagent.controller;
 
 import com.lianba.aiagent.common.BaseResponse;
 import com.lianba.aiagent.common.ResultUtils;

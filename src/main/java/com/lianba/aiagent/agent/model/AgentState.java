@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.agent.model;
+package com.lianba.aiagent.agent.model;
 
 /**
  * 代理执行状态的枚举类

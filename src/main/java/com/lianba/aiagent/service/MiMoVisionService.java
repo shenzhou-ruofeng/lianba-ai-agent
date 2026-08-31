@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.service;
+package com.lianba.aiagent.service;
 
 import cn.hutool.core.codec.Base64;
 import cn.hutool.core.util.StrUtil;

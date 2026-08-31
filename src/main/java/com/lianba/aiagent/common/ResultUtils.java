@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.common;
+package com.lianba.aiagent.common;
 
 import com.lianba.aiagent.exception.ErrorCode;
 

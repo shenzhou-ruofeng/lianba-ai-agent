@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.controller;
+package com.lianba.aiagent.controller;
 
 import com.lianba.aiagent.agent.Manus;
 import com.lianba.aiagent.agent.interaction.HumanInteractionRegistry;
@@ -107,6 +107,35 @@ public class AiController {
     @GetMapping(value = "/love_app/chat/rag_sse", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> doChatWithLoveAppRagSSE(String message, String chatId) {
         return loveApp.doChatWithRagByStream(message, chatId);
+    }
+
+    /**
+     * SSE 流式调用 AI 恋爱大师（带工具调用能力，融合超级智能体工具）
+     * 支持纯文本对话和带图片的工具调用（图片编辑、约会规划等）
+     *
+     * @param message 用户消息
+     * @param chatId  会话 ID
+     * @return SseEmitter 流式响应（JSON 格式：tool_call / tool_result / text / generated_image / files / status）
+     */
+    @GetMapping(value = "/love_app/chat/tools_sse", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter doChatWithLoveAppToolsSSE(String message, String chatId) {
+        return loveApp.doChatWithToolsStream(message, chatId, null);
+    }
+
+    /**
+     * SSE 流式调用 AI 恋爱大师（带工具调用 + 图片支持）
+     * 支持用户上传的图片作为工具调用上下文（图片编辑、视觉理解等场景）
+     *
+     * @param body JSON body：{ message, chatId, imageUrls? }
+     * @return SseEmitter 流式响应
+     */
+    @PostMapping(value = "/love_app/chat/tools_sse", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter doChatWithLoveAppToolsVisionSSE(@RequestBody Map<String, Object> body) {
+        String message = (String) body.getOrDefault("message", "");
+        String chatId = (String) body.getOrDefault("chatId", "");
+        @SuppressWarnings("unchecked")
+        List<String> imageUrls = (List<String>) body.getOrDefault("imageUrls", List.of());
+        return loveApp.doChatWithToolsStream(message, chatId, imageUrls);
     }
 
     /**

@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.tools;
+package com.lianba.aiagent.tools;
 
 import cn.hutool.core.util.StrUtil;
 import com.lianba.aiagent.agent.interaction.HumanInteractionRegistry;

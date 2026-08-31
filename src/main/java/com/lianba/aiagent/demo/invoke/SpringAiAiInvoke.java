@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.demo.invoke;
+package com.lianba.aiagent.demo.invoke;
 
 import jakarta.annotation.Resource;
 import org.springframework.ai.chat.messages.AssistantMessage;

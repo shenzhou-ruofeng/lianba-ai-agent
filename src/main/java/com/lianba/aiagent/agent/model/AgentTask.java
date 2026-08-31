@@ -1,8 +1,9 @@
-﻿package com.lianba.aiagent.agent.model;
+package com.lianba.aiagent.agent.model;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.lianba.aiagent.agent.BaseAgent;
 import lombok.Data;
 
 import java.io.Serializable;

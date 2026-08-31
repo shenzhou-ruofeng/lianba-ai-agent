@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.agent;
+package com.lianba.aiagent.agent;
 
 import com.lianba.aiagent.advisor.MyLoggerAdvisor;
 import org.springframework.ai.chat.client.ChatClient;

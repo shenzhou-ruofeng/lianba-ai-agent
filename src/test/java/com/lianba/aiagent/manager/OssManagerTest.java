@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.manager;
+package com.lianba.aiagent.manager;
 
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;

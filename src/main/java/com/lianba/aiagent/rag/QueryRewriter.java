@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.rag;
+package com.lianba.aiagent.rag;
 
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;

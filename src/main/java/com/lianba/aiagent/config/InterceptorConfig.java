@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.config;
+package com.lianba.aiagent.config;
 
 import jakarta.annotation.Resource;
 import org.springframework.context.annotation.Configuration;

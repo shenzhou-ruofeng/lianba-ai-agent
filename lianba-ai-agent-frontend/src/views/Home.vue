@@ -40,11 +40,11 @@
           <div class="hero-actions reveal" style="--stagger: 540ms">
             <router-link to="/love-master" class="cta cta-primary">
               <span class="cta-icon" aria-hidden="true">♡</span>
-              体验 AI 恋爱大师
+              开始对话
             </router-link>
-            <router-link to="/super-agent" class="cta cta-ghost">
-              <span class="cta-icon" aria-hidden="true">✦</span>
-              进入 AI 超级智能体
+            <router-link to="/export" class="cta cta-ghost">
+              <span class="cta-icon" aria-hidden="true">❋</span>
+              管理我的会话
             </router-link>
           </div>
 
@@ -104,42 +104,20 @@
           <article class="agent-card agent-love scroll-reveal">
             <div class="agent-glow" aria-hidden="true"></div>
             <div class="agent-top">
-              <span class="agent-badge">情感 · RAG 增强</span>
+              <span class="agent-badge">情感 · 全能助手</span>
               <span class="agent-emoji" aria-hidden="true">♡</span>
             </div>
             <h3 class="agent-name">AI 恋爱大师</h3>
             <p class="agent-desc">
-              基于候选人知识库的恋爱对象推荐与情感咨询，支持生成专属恋爱报告，一键导出 PDF / Word / Markdown。
+              你的 AI 情感伙伴与生活助手：恋爱咨询、对象推荐、约会规划、图片编辑、报告生成，一次对话全搞定。
             </p>
             <ul class="agent-points">
               <li><span class="point-mark" aria-hidden="true">✦</span>恋爱咨询与对象推荐双模式</li>
-              <li><span class="point-mark" aria-hidden="true">✦</span>性别硬过滤，精准匹配</li>
+              <li><span class="point-mark" aria-hidden="true">✦</span>约会计划 PDF / 图片编辑 / 联网搜索</li>
               <li><span class="point-mark" aria-hidden="true">✦</span>恋爱报告生成与多格式导出</li>
             </ul>
             <router-link to="/love-master" class="agent-cta">
-              与恋爱大师对话
-              <span class="agent-arrow" aria-hidden="true">→</span>
-            </router-link>
-          </article>
-
-          <!-- AI 超级智能体 -->
-          <article class="agent-card agent-super scroll-reveal" :style="{ transitionDelay: '140ms' }">
-            <div class="agent-glow" aria-hidden="true"></div>
-            <div class="agent-top">
-              <span class="agent-badge">全能 · 工具调用</span>
-              <span class="agent-emoji" aria-hidden="true">✦</span>
-            </div>
-            <h3 class="agent-name">AI 超级智能体</h3>
-            <p class="agent-desc">
-              能思考、能行动的智能体：联网搜索、网页抓取、图片理解与生成、PDF 生成、邮件发送，把任务交给它，把结果留给自己。
-            </p>
-            <ul class="agent-points">
-              <li><span class="point-mark" aria-hidden="true">✦</span>深度思考过程可视化</li>
-              <li><span class="point-mark" aria-hidden="true">✦</span>多模态图文理解与生成</li>
-              <li><span class="point-mark" aria-hidden="true">✦</span>十余种实用工具自由调用</li>
-            </ul>
-            <router-link to="/super-agent" class="agent-cta">
-              与超级智能体对话
+              开始对话
               <span class="agent-arrow" aria-hidden="true">→</span>
             </router-link>
           </article>
@@ -167,19 +145,19 @@
       <section class="seo-content" aria-label="平台介绍详情">
         <div class="seo-inner scroll-reveal">
           <div class="seo-text">
-            <h2>恋吧 AI 超级智能体应用平台，让对话更有价值</h2>
+            <h2>恋吧 AI，让每一次对话都有温度</h2>
             <p>
-              恋吧 AI 超级智能体应用平台（Lianba AI Agent Platform）是集情感咨询、专业问答、多模态理解与文件导出于一体的智能对话平台。
-              <strong>AI 恋爱大师</strong>基于 RAG 知识库检索增强技术，从候选人知识库中精准推荐恋爱对象，并生成结构化恋爱报告；
-              <strong>AI 超级智能体</strong>具备深度思考与工具调用能力，可完成联网搜索、网页抓取、图片生成、PDF 文档生成等复杂任务。
+              恋吧 AI 是面向 20-35 岁用户的垂直情感社交平台，以 <strong>AI 恋爱大师</strong>为核心入口，
+              融合情感咨询、对象推荐、约会规划、图片编辑、报告生成等一站式能力。
+              基于 RAG 知识库检索增强与十余种实用工具，让每一次对话都更懂你、更有用。
             </p>
             <p>
               平台支持语音输入、图片理解、会话历史管理与多格式导出（PDF / Word / Markdown），
-              无论是寻找情感建议，还是解决工作学习中的专业问题，恋吧 AI 都能提供高效、可靠的智能服务。
+              无论是梳理情感困惑，还是规划一场浪漫约会，恋吧 AI 都能提供温暖、可靠的智能服务。
             </p>
           </div>
           <div class="seo-facts">
-            <div class="fact-row"><span class="fact-key">支持应用</span><span class="fact-val">恋爱大师 · 超级智能体</span></div>
+            <div class="fact-row"><span class="fact-key">核心能力</span><span class="fact-val">情感咨询 · 工具调用</span></div>
             <div class="fact-row"><span class="fact-key">知识检索</span><span class="fact-val">RAG 混合检索增强</span></div>
             <div class="fact-row"><span class="fact-key">多模态</span><span class="fact-val">图片 / 语音 / 文档</span></div>
             <div class="fact-row"><span class="fact-key">导出格式</span><span class="fact-val">PDF / Word / Markdown</span></div>
@@ -192,7 +170,7 @@
       <section class="final-cta scroll-reveal">
         <div class="final-inner">
           <h2 class="final-title">准备好开始了吗？</h2>
-          <p class="final-sub">登录后即可与两大智能体畅聊，历史会话随时回顾、一键导出</p>
+          <p class="final-sub">登录后即可与 AI 恋爱大师畅聊，历史会话随时回顾、一键导出</p>
           <div class="final-actions">
             <router-link v-if="!isLoggedIn" to="/login" class="cta cta-primary">立即登录体验</router-link>
             <router-link v-else to="/love-master" class="cta cta-primary">开始对话</router-link>
@@ -215,23 +193,23 @@ import { useAuth } from '../composables/useAuth'
 
 // SEO / GEO 元数据
 useHead({
-  title: '恋吧AI超级智能体应用平台 - AI恋爱大师与AI超级智能体',
+  title: '恋吧AI - AI恋爱大师情感咨询平台',
   meta: [
     {
       name: 'description',
-      content: '恋吧AI超级智能体应用平台，提供AI恋爱大师情感咨询与AI超级智能体全能问答服务。支持RAG知识库检索、多模态对话、语音输入与PDF报告导出。'
+      content: '恋吧AI，你的AI情感伙伴与生活助手。提供恋爱咨询、对象推荐、约会规划、图片编辑、报告生成等一站式情感生活服务。'
     },
     {
       name: 'keywords',
-      content: 'AI智能体,AI恋爱大师,恋爱咨询,情感顾问,AI助手,智能对话,恋吧,AI超级智能体,在线问答,AI报告导出'
+      content: 'AI智能体,AI恋爱大师,恋爱咨询,情感顾问,AI助手,智能对话,恋吧,约会规划,图片编辑,在线问答'
     },
     {
       property: 'og:title',
-      content: '恋吧AI超级智能体应用平台 - AI恋爱大师与AI超级智能体'
+      content: '恋吧AI - AI恋爱大师情感咨询平台'
     },
     {
       property: 'og:description',
-      content: 'AI恋爱大师陪你聊情感、AI超级智能体帮你解难题，支持多模态对话与会话报告导出。'
+      content: 'AI恋爱大师陪你聊情感、帮你做规划、编辑图片，支持多模态对话与会话报告导出。'
     }
   ]
 })
@@ -261,8 +239,8 @@ const features = [
   {
     icon: '✦',
     bg: 'linear-gradient(135deg, #f5eefc, #efe6f8)',
-    title: '深度思考智能体',
-    desc: '超级智能体具备分步推理与工具调用能力，思考过程清晰可见，执行结果真实可靠。'
+    title: '工具调用可视化',
+    desc: 'AI 在对话中自动调用工具完成任务，思考过程与执行步骤清晰可见，执行结果真实可靠。'
   },
   {
     icon: '⌘',
@@ -274,7 +252,7 @@ const features = [
     icon: '☷',
     bg: 'linear-gradient(135deg, #fdeef4, #f9e4ec)',
     title: '会话历史管理',
-    desc: '每个智能体独立维护会话列表，随时切换历史对话、新建会话，重要记录一键导出备份。'
+    desc: '独立维护会话列表，随时切换历史对话、新建会话，重要记录一键导出备份。'
   }
 ]
 
@@ -739,10 +717,10 @@ onBeforeUnmount(() => {
 }
 
 .agent-showcase {
-  max-width: 1120px;
+  max-width: 640px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 26px;
 }
 

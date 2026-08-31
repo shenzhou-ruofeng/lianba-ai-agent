@@ -90,6 +90,12 @@
             <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
             <version>3.5.9</version>
         </dependency>
+        <!-- MyBatis-Plus JSqlParser 插件（分页等，3.5.7+ 需单独引入） -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-jsqlparser</artifactId>
+            <version>3.5.9</version>
+        </dependency>
         <!-- Flyway（数据库版本迁移） -->
         <dependency>
             <groupId>org.flywaydb</groupId>

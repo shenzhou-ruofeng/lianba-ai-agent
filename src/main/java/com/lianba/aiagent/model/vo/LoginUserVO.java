@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.model.vo;
+package com.lianba.aiagent.model.vo;
 
 import lombok.Data;
 

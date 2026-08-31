@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.service;
+package com.lianba.aiagent.service;
 
 import com.itextpdf.kernel.font.PdfFont;
 import com.itextpdf.kernel.font.PdfFontFactory;

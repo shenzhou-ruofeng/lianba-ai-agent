@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.rag;
+package com.lianba.aiagent.rag;
 
 import jakarta.annotation.Resource;
 import org.springframework.ai.document.Document;

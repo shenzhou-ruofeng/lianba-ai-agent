@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.agent;
+package com.lianba.aiagent.agent;
 
 import com.lianba.aiagent.agent.model.AgentState;
 import lombok.Data;

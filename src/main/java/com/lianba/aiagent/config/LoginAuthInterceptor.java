@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.config;
+package com.lianba.aiagent.config;
 
 import com.lianba.aiagent.exception.BusinessException;
 import com.lianba.aiagent.exception.ErrorCode;

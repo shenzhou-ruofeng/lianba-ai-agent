@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.exception;
+package com.lianba.aiagent.exception;
 
 /**
  * 异常抛出工具类，条件成立即抛出业务异常，简化参数校验代码

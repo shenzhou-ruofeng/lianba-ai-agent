@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.agent.model;
+package com.lianba.aiagent.agent.model;
 
 /**
  * 智能体推理任务状态

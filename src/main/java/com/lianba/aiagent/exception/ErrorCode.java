@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.exception;
+package com.lianba.aiagent.exception;
 
 import lombok.Getter;
 

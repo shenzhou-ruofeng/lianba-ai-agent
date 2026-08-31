@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.app.model;
+package com.lianba.aiagent.app.model;
 
 import java.util.List;
 

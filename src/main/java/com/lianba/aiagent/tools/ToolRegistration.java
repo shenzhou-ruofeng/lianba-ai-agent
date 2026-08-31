@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.tools;
+package com.lianba.aiagent.tools;
 
 import com.lianba.aiagent.manager.OssManager;
 import com.lianba.aiagent.service.WanImageService;

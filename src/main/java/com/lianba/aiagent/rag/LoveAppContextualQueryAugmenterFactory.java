@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.rag;
+package com.lianba.aiagent.rag;
 
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.rag.generation.augmentation.ContextualQueryAugmenter;

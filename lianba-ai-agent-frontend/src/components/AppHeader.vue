@@ -15,9 +15,6 @@
         <router-link to="/love-master" class="nav-link" :class="{ active: isLove }">
           AI恋爱大师
         </router-link>
-        <router-link to="/super-agent" class="nav-link" :class="{ active: isSuper }">
-          AI超级智能体
-        </router-link>
         <router-link to="/export" class="nav-link" :class="{ active: isExport }">
           导出会话
         </router-link>
@@ -87,7 +84,6 @@ const avatarText = computed(() => (displayName.value || '?').charAt(0).toUpperCa
 
 const isHome = computed(() => route.path === '/')
 const isLove = computed(() => route.path.startsWith('/love-master'))
-const isSuper = computed(() => route.path.startsWith('/super-agent'))
 const isExport = computed(() => route.path.startsWith('/export'))
 
 const toggleMenu = () => {

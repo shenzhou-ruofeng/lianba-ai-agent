@@ -65,9 +65,65 @@ export const connectSSE = (url, params, onMessage, onError) => {
   return eventSource
 }
 
-// AI恋爱大师聊天（集成 RAG 知识库检索增强）
+// AI恋爱大师聊天（带工具调用能力，融合超级智能体工具）
 export const chatWithLoveApp = (message, chatId) => {
-  return connectSSE('/ai/love_app/chat/rag_sse', { message, chatId })
+  return connectSSE('/ai/love_app/chat/tools_sse', { message, chatId })
+}
+
+// AI恋爱大师聊天（带工具调用 + 图片支持，POST + JSON body + SSE）
+export const chatWithLoveAppVision = (message, chatId, imageUrls = [], onMessage, onError) => {
+  const url = `${API_BASE_URL}/ai/love_app/chat/tools_sse`
+  const controller = new AbortController()
+  const eventSourceLike = {
+    close: () => controller.abort(),
+    onmessage: null,
+    onerror: null
+  }
+
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ message, chatId, imageUrls: imageUrls || [] }),
+    signal: controller.signal
+  }).then(async response => {
+    if (!response.ok) {
+      const err = new Error(`HTTP ${response.status}`)
+      if (eventSourceLike.onerror) eventSourceLike.onerror(err)
+      if (onError) onError(err)
+      return
+    }
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+      for (const line of lines) {
+        const trimmed = line.trim()
+        if (trimmed.startsWith('data:')) {
+          const data = trimmed.substring(5).trim()
+          if (eventSourceLike.onmessage) eventSourceLike.onmessage({ data })
+          if (onMessage) onMessage(data)
+        }
+      }
+    }
+    if (buffer.trim().startsWith('data:')) {
+      const data = buffer.trim().substring(5).trim()
+      if (eventSourceLike.onmessage) eventSourceLike.onmessage({ data })
+      if (onMessage) onMessage(data)
+    }
+  }).catch(err => {
+    if (err.name !== 'AbortError') {
+      if (eventSourceLike.onerror) eventSourceLike.onerror(err)
+      if (onError) onError(err)
+    }
+  })
+
+  return eventSourceLike
 }
 
 // AI恋爱对象推荐（基于 RAG 候选人知识库，SSE 流式）
@@ -352,6 +408,7 @@ export const getManusTask = async (taskId) => {
 
 export default {
   chatWithLoveApp,
+  chatWithLoveAppVision,
   matchWithLoveApp,
   generateLoveReport,
   exportLoveReport,

@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.app;
+package com.lianba.aiagent.app;
 
 import com.lianba.aiagent.app.model.LoveReport;
 import jakarta.annotation.Resource;

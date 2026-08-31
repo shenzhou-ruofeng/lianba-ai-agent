@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.chatmemory;
+package com.lianba.aiagent.chatmemory;
 
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;

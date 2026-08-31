@@ -1,4 +1,4 @@
-﻿package com.lianba.aiagent.rag.hybrid;
+package com.lianba.aiagent.rag.hybrid;
 
 import com.lianba.aiagent.config.HybridRetrievalProperties;
 import com.lianba.aiagent.rag.LoveAppContextualQueryAugmenterFactory;
