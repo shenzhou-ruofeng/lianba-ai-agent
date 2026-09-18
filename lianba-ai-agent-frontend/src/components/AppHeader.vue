@@ -13,7 +13,16 @@
       <nav class="main-nav" aria-label="主导航">
         <router-link to="/" class="nav-link" :class="{ active: isHome }">首页</router-link>
         <router-link to="/love-master" class="nav-link" :class="{ active: isLove }">
-          AI恋爱大师
+          AI 恋爱大师
+        </router-link>
+        <router-link to="/diary" class="nav-link" :class="{ active: isDiary }">
+          情感日记
+        </router-link>
+        <router-link to="/community" class="nav-link" :class="{ active: isCommunity }">
+          情感社区
+        </router-link>
+        <router-link to="/reports" class="nav-link" :class="{ active: isReportHistory }">
+          恋爱报告历史
         </router-link>
         <router-link to="/export" class="nav-link" :class="{ active: isExport }">
           导出会话
@@ -84,6 +93,9 @@ const avatarText = computed(() => (displayName.value || '?').charAt(0).toUpperCa
 
 const isHome = computed(() => route.path === '/')
 const isLove = computed(() => route.path.startsWith('/love-master'))
+const isDiary = computed(() => route.path === '/diary')
+const isCommunity = computed(() => route.path === '/community')
+const isReportHistory = computed(() => route.path === '/reports')
 const isExport = computed(() => route.path.startsWith('/export'))
 
 const toggleMenu = () => {

@@ -14,7 +14,7 @@ import com.lianba.aiagent.model.vo.LoveReportVO;
 import com.lianba.aiagent.service.AgentTaskService;
 import com.lianba.aiagent.service.LoveReportExportService;
 import com.lianba.aiagent.service.LoveReportService;
-import com.lianba.aiagent.service.MiMoVisionService;
+import com.lianba.aiagent.service.DeepSeekChatService;
 import com.lianba.aiagent.service.UsageStatisticsService;
 import com.lianba.aiagent.service.UserService;
 import jakarta.annotation.Resource;
@@ -56,7 +56,7 @@ public class AiController {
     private ChatModel dashscopeChatModel;
 
     @Resource
-    private MiMoVisionService miMoVisionService;
+    private DeepSeekChatService deepSeekChatService;
 
     @Resource
     private LoveReportExportService loveReportExportService;
@@ -122,15 +122,17 @@ public class AiController {
      * @return SseEmitter 流式响应（JSON 格式：tool_call / tool_result / text / generated_image / files / status）
      */
     @GetMapping(value = "/love_app/chat/tools_sse", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter doChatWithLoveAppToolsSSE(String message, String chatId) {
-        return loveApp.doChatWithToolsStream(message, chatId, null);
+    public SseEmitter doChatWithLoveAppToolsSSE(String message, String chatId,
+                                                @RequestParam(defaultValue = "false") boolean deepThink,
+                                                @RequestParam(defaultValue = "false") boolean webSearch) {
+        return loveApp.doChatWithToolsStream(message, chatId, null, deepThink, webSearch);
     }
 
     /**
      * SSE 流式调用 AI 恋爱大师（带工具调用 + 图片支持）
      * 支持用户上传的图片作为工具调用上下文（图片编辑、视觉理解等场景）
      *
-     * @param body JSON body：{ message, chatId, imageUrls? }
+     * @param body JSON body：{ message, chatId, imageUrls?, deepThink?, webSearch? }
      * @return SseEmitter 流式响应
      */
     @PostMapping(value = "/love_app/chat/tools_sse", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -139,7 +141,9 @@ public class AiController {
         String chatId = (String) body.getOrDefault("chatId", "");
         @SuppressWarnings("unchecked")
         List<String> imageUrls = (List<String>) body.getOrDefault("imageUrls", List.of());
-        return loveApp.doChatWithToolsStream(message, chatId, imageUrls);
+        boolean deepThink = Boolean.TRUE.equals(body.get("deepThink"));
+        boolean webSearch = Boolean.TRUE.equals(body.get("webSearch"));
+        return loveApp.doChatWithToolsStream(message, chatId, imageUrls, deepThink, webSearch);
     }
 
     /**
@@ -434,7 +438,7 @@ public class AiController {
     /**
      * 支持图片视觉理解的流式调用（POST JSON body）
      * 流程：接收 message + imageUrls + 可选的 imageUnderstandings（前端选图时已预解析）
-     * → 若未预解析则调用 MIMO-v2.5 视觉理解 → 拼接理解结果与图片地址 → 喂给智能体 → 流式输出
+     * → 若未预解析则调用 DeepSeek-Flash 多模态理解 → 拼接理解结果与图片地址 → 喂给智能体 → 流式输出
      * 图片地址会注入上下文，供智能体在用户要求修改图片时作为 generateImage 的参考图使用。
      *
      * @param body JSON body，包含 message（文本）、imageUrls（图片 URL 列表）、imageUnderstandings（可选，预解析结果列表）
@@ -448,16 +452,16 @@ public class AiController {
         @SuppressWarnings("unchecked")
         List<String> imageUnderstandings = (List<String>) body.getOrDefault("imageUnderstandings", List.of());
 
-        // 优先使用前端选图时预解析的结果，避免重复解析；无预解析结果时实时调用 MIMO
+        // 优先使用前端选图时预解析的结果，避免重复解析；无预解析结果时实时调用 DeepSeek-Flash 多模态理解
         String understanding = "";
         if (imageUnderstandings != null && !imageUnderstandings.isEmpty()) {
             understanding = String.join("\n\n", imageUnderstandings);
         } else if (imageUrls != null && !imageUrls.isEmpty()) {
-            understanding = miMoVisionService.understandImages(imageUrls, null);
+            understanding = deepSeekChatService.understandImages(imageUrls, null);
         }
 
         // 将图片理解结果拼接到用户消息中
-        String enhancedMessage = miMoVisionService.buildVisionEnhancedMessage(message, understanding);
+        String enhancedMessage = deepSeekChatService.buildVisionEnhancedMessage(message, understanding);
 
         // 附加图片地址上下文，供智能体图生图时作为参考图
         if (imageUrls != null && !imageUrls.isEmpty()) {

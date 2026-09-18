@@ -108,6 +108,51 @@
         </div>
       </section>
 
+      <!-- 每日情感建议 -->
+      <section class="daily-advice">
+        <div class="advice-header">
+          <p class="page-eyebrow">Daily Advice</p>
+          <h2 class="page-title">💝 每日情感建议</h2>
+          <p class="page-desc">AI 根据你的情感状态和日记内容，为你生成专属的情感建议</p>
+        </div>
+
+        <!-- 加载状态 -->
+        <div v-if="loadingAdvice" class="loading-state">
+          <span class="loading-spinner"></span>
+          <p>加载中...</p>
+        </div>
+
+        <!-- 空状态 -->
+        <div v-else-if="!todayAdvice" class="empty-state">
+          <span class="empty-icon">📝</span>
+          <p>今天还没有建议哦</p>
+          <button class="advice-gen-btn" :disabled="generatingAdvice" @click="handleGenerateAdvice">
+            {{ generatingAdvice ? '生成中...' : '✨ 生成今日建议' }}
+          </button>
+        </div>
+
+        <!-- 建议卡片 -->
+        <div v-else class="advice-card">
+          <div class="advice-content">{{ todayAdvice.content }}</div>
+          <div class="advice-footer">
+            <span class="advice-date">{{ formatDate(todayAdvice.adviceDate || todayAdvice.createTime) }}</span>
+            <button class="advice-regen-btn" :disabled="generatingAdvice" @click="handleGenerateAdvice">
+              {{ generatingAdvice ? '生成中...' : '重新生成' }}
+            </button>
+          </div>
+          <div v-if="adviceHistory.length" class="advice-history-toggle" @click="showAdviceHistory = !showAdviceHistory">
+            <span>{{ showAdviceHistory ? '收起历史' : '查看最近建议' }}</span>
+            <span>{{ showAdviceHistory ? '▲' : '▼' }}</span>
+          </div>
+          <div v-show="showAdviceHistory" class="advice-history-list">
+            <div v-for="adv in adviceHistory" :key="adv.id" class="advice-history-item">
+              <span class="advice-history-date">{{ formatDate(adv.adviceDate || adv.createTime) }}</span>
+              <p class="advice-history-content">{{ adv.content }}</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- 关系状态时间线 -->
       <section class="diary-timeline" v-if="timeline.length">
         <h2 class="section-heading">💕 我的情感历程</h2>
@@ -136,7 +181,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { useHead } from '@vueuse/head'
 import AppHeader from '../components/AppHeader.vue'
 import AppFooter from '../components/AppFooter.vue'
-import { createDiary, listDiaries, deleteDiary, analyzeDiary, getRelationshipTimeline } from '../api'
+import { createDiary, listDiaries, deleteDiary, analyzeDiary, getRelationshipTimeline, getTodayAdvice, getAdviceHistory, generateAdvice } from '../api'
 
 useHead({
   title: '情感日记 - 恋吧AI',
@@ -163,6 +208,13 @@ const loadingDiaries = ref(true)
 const expandedAnalysis = reactive({})
 const analyzingId = ref(null)
 const timeline = ref([])
+
+// 每日情感建议
+const todayAdvice = ref(null)
+const adviceHistory = ref([])
+const loadingAdvice = ref(true)
+const generatingAdvice = ref(false)
+const showAdviceHistory = ref(false)
 
 const addTag = () => {
   const tag = tagInput.value.trim()
@@ -230,6 +282,20 @@ const statusLabel = (status) => {
   return map[status] || status || '未设置'
 }
 
+const handleGenerateAdvice = async () => {
+  generatingAdvice.value = true
+  try {
+    const res = await generateAdvice()
+    if (res.code === 0 && res.data) {
+      todayAdvice.value = res.data
+    }
+  } catch (e) {
+    console.error('生成建议失败:', e)
+  } finally {
+    generatingAdvice.value = false
+  }
+}
+
 const formatDate = (ts) => {
   if (!ts) return ''
   const d = new Date(ts)
@@ -246,9 +312,11 @@ const formatTime = (ts) => {
 
 onMounted(async () => {
   try {
-    const [diaryRes, timelineRes] = await Promise.all([
+    const [diaryRes, timelineRes, adviceRes, historyRes] = await Promise.all([
       listDiaries(),
-      getRelationshipTimeline()
+      getRelationshipTimeline(),
+      getTodayAdvice(),
+      getAdviceHistory(7)
     ])
     if (diaryRes.code === 0 && diaryRes.data) {
       diaries.value = diaryRes.data
@@ -256,10 +324,13 @@ onMounted(async () => {
     if (timelineRes.code === 0 && timelineRes.data) {
       timeline.value = timelineRes.data.reverse()
     }
+    if (adviceRes.code === 0) todayAdvice.value = adviceRes.data
+    if (historyRes.code === 0 && historyRes.data) adviceHistory.value = historyRes.data
   } catch (e) {
     console.error('加载数据失败:', e)
   } finally {
     loadingDiaries.value = false
+    loadingAdvice.value = false
   }
 })
 </script>
@@ -745,6 +816,150 @@ onMounted(async () => {
 .timeline-new {
   font-weight: 600;
   color: #e05575;
+}
+
+/* 每日情感建议 */
+.daily-advice {
+  margin-top: 40px;
+}
+
+.advice-header {
+  text-align: center;
+  margin-bottom: 36px;
+}
+
+.advice-header .page-eyebrow {
+  color: #e05575;
+}
+
+.advice-header .page-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #2c2520;
+  margin-bottom: 8px;
+}
+
+.advice-header .page-desc {
+  font-size: 0.92rem;
+  color: #888;
+}
+
+.advice-card {
+  background: linear-gradient(135deg, #fff5f7, #fff9fb);
+  border: 1px solid #fdeef0;
+  border-radius: 14px;
+  padding: 24px 28px;
+  margin-bottom: 20px;
+}
+
+.advice-content {
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: #444;
+  margin-bottom: 16px;
+  white-space: pre-wrap;
+}
+
+.advice-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 14px;
+  border-top: 1px dashed #fdeef0;
+}
+
+.advice-date {
+  font-size: 0.78rem;
+  color: #bbb;
+}
+
+.advice-regen-btn {
+  padding: 5px 14px;
+  border-radius: 999px;
+  border: 1px solid #ffd6e0;
+  background: #fff;
+  font-size: 0.78rem;
+  color: #e05575;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.advice-regen-btn:hover:not(:disabled) {
+  background: #fff0f3;
+  border-color: #ff8fab;
+}
+
+.advice-regen-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.advice-history-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px dashed #fdeef0;
+  font-size: 0.82rem;
+  color: #999;
+  cursor: pointer;
+}
+
+.advice-history-toggle:hover {
+  color: #e05575;
+}
+
+.advice-history-list {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.advice-history-item {
+  padding: 10px 14px;
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid #fdeef0;
+}
+
+.advice-history-date {
+  font-size: 0.75rem;
+  color: #bbb;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.advice-history-content {
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: #666;
+  margin: 0;
+}
+
+.advice-gen-btn {
+  margin-top: 12px;
+  padding: 10px 24px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ff6b8b, #ff8fa3);
+  color: #fff;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 16px rgba(255, 107, 139, 0.2);
+}
+
+.advice-gen-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(255, 107, 139, 0.3);
+}
+
+.advice-gen-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 @media (max-width: 600px) {

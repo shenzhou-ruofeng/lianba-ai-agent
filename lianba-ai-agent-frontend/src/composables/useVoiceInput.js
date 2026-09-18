@@ -80,8 +80,8 @@ export function useVoiceInput() {
         finalText += text
         partialText = ''
       } else {
-        // online（流式）结果：累加为临时文本
-        partialText += text
+        // online（流式）临时结果：本地 faster-whisper 服务返回的是累计全文，直接替换临时文本
+        partialText = text
       }
       emitText()
     } catch (e) {

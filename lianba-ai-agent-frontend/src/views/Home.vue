@@ -33,7 +33,7 @@
           </h1>
 
           <p class="hero-sub reveal" style="--stagger: 400ms">
-            AI 恋爱大师陪你梳理情感困惑，AI 超级智能体帮你解决专业难题。
+            <strong>恋吧 AI</strong>——你的专属情感伴侣，提供恋爱咨询、对象推荐、约会规划等一站式服务。
             基于 RAG 知识库检索增强与多模态能力，每一次对话都更懂你。
           </p>
 
@@ -94,9 +94,12 @@
       <!-- ========== 智能体产品区 ========== -->
       <section class="agents" aria-label="智能体应用">
         <div class="section-head scroll-reveal">
-          <p class="section-eyebrow">Agents</p>
-          <h2 class="section-title">两大智能体，<span class="text-gradient">各有专长</span></h2>
-          <p class="section-desc">选择适合你的助手，开启一段有温度的 AI 对话</p>
+          <p class="section-eyebrow">Our Agent</p>
+          <h2 class="section-title"><span class="text-gradient">恋吧 AI</span>，你的专属<span class="text-gradient">情感伴侣</span></h2>
+          <p class="section-desc">
+            当前平台已开放的服务为<strong>「恋吧 AI·恋爱大师」</strong>，专注于情感陪伴与生活助手，提供有温度的 AI 对话体验。
+            <br>新用户首次注册登录后，系统将引导您选择当前情感状态（单身/恋爱中/已婚），以便 AI 提供更个性化的情感建议。
+          </p>
         </div>
 
         <div class="agent-showcase">
@@ -107,9 +110,9 @@
               <span class="agent-badge">情感 · 全能助手</span>
               <span class="agent-emoji" aria-hidden="true">♡</span>
             </div>
-            <h3 class="agent-name">AI 恋爱大师</h3>
+            <h3 class="agent-name">恋吧 AI · 恋爱大师</h3>
             <p class="agent-desc">
-              你的 AI 情感伙伴与生活助手：恋爱咨询、对象推荐、约会规划、图片编辑、报告生成，一次对话全搞定。
+              你的专属 AI 情感伙伴与生活助手：恋爱咨询、对象推荐、约会规划、图片编辑、报告生成，一次对话全搞定。
             </p>
             <ul class="agent-points">
               <li><span class="point-mark" aria-hidden="true">✦</span>恋爱咨询与对象推荐双模式</li>
@@ -147,13 +150,16 @@
           <div class="seo-text">
             <h2>恋吧 AI，让每一次对话都有温度</h2>
             <p>
-              恋吧 AI 是面向 20-35 岁用户的垂直情感社交平台，以 <strong>AI 恋爱大师</strong>为核心入口，
+              恋吧 AI 是面向 20-35 岁用户的垂直情感社交平台，以<strong>恋吧 AI·恋爱大师</strong>为核心产品，
               融合情感咨询、对象推荐、约会规划、图片编辑、报告生成等一站式能力。
               基于 RAG 知识库检索增强与十余种实用工具，让每一次对话都更懂你、更有用。
             </p>
             <p>
               平台支持语音输入、图片理解、会话历史管理与多格式导出（PDF / Word / Markdown），
               无论是梳理情感困惑，还是规划一场浪漫约会，恋吧 AI 都能提供温暖、可靠的智能服务。
+            </p>
+            <p style="margin-top: 18px; color: var(--ink-soft); font-size: 0.88rem;">
+              <strong>注：</strong>当前平台已开放的服务为<strong>恋吧 AI·恋爱大师</strong>，专注于情感陪伴与生活服务。更多智能体产品敬请期待。
             </p>
           </div>
           <div class="seo-facts">
@@ -193,23 +199,23 @@ import { useAuth } from '../composables/useAuth'
 
 // SEO / GEO 元数据
 useHead({
-  title: '恋吧AI - AI恋爱大师情感咨询平台',
+  title: '恋吧 AI - 你的专属情感伴侣',
   meta: [
     {
       name: 'description',
-      content: '恋吧AI，你的AI情感伙伴与生活助手。提供恋爱咨询、对象推荐、约会规划、图片编辑、报告生成等一站式情感生活服务。'
+      content: '恋吧 AI，你的专属 AI 情感伙伴与生活助手。提供恋爱咨询、对象推荐、约会规划、图片编辑、报告生成等一站式情感生活服务。'
     },
     {
       name: 'keywords',
-      content: 'AI智能体,AI恋爱大师,恋爱咨询,情感顾问,AI助手,智能对话,恋吧,约会规划,图片编辑,在线问答'
+      content: 'AI 恋爱大师，情感顾问，AI 助手，智能对话，恋吧，约会规划，图片编辑，在线问答，情感陪伴'
     },
     {
       property: 'og:title',
-      content: '恋吧AI - AI恋爱大师情感咨询平台'
+      content: '恋吧 AI - 你的专属情感伴侣'
     },
     {
       property: 'og:description',
-      content: 'AI恋爱大师陪你聊情感、帮你做规划、编辑图片，支持多模态对话与会话报告导出。'
+      content: '恋吧 AI 是你的专属 AI 情感伙伴，提供恋爱咨询、对象推荐、约会规划等一站式情感生活服务。'
     }
   ]
 })
@@ -258,7 +264,7 @@ const features = [
 
 const steps = [
   { title: '注册登录', desc: '使用邮箱快速注册，验证码登录，会话数据与账号绑定，安全私密。' },
-  { title: '选择智能体', desc: '按需选择 AI 恋爱大师或 AI 超级智能体，开启你的专属对话。' },
+  { title: '情感状态设置', desc: '首次登录时选择您的情感状态（单身/恋爱中/已婚），AI 将据此提供更具针对性的情感陪伴与建议。' },
   { title: '对话与导出', desc: '畅快对话后，可在会话管理中回顾历史，并导出为 PDF / Word / Markdown。' }
 ]
 

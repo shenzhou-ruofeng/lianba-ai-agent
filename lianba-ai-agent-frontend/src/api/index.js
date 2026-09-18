@@ -66,12 +66,13 @@ export const connectSSE = (url, params, onMessage, onError) => {
 }
 
 // AI恋爱大师聊天（带工具调用能力，融合超级智能体工具）
-export const chatWithLoveApp = (message, chatId) => {
-  return connectSSE('/ai/love_app/chat/tools_sse', { message, chatId })
+// deepThink：深度思考模式；webSearch：强制联网搜索
+export const chatWithLoveApp = (message, chatId, { deepThink = false, webSearch = false } = {}) => {
+  return connectSSE('/ai/love_app/chat/tools_sse', { message, chatId, deepThink, webSearch })
 }
 
 // AI恋爱大师聊天（带工具调用 + 图片支持，POST + JSON body + SSE）
-export const chatWithLoveAppVision = (message, chatId, imageUrls = [], onMessage, onError) => {
+export const chatWithLoveAppVision = (message, chatId, imageUrls = [], onMessage, onError, { deepThink = false, webSearch = false } = {}) => {
   const url = `${API_BASE_URL}/ai/love_app/chat/tools_sse`
   const controller = new AbortController()
   const eventSourceLike = {
@@ -84,7 +85,7 @@ export const chatWithLoveAppVision = (message, chatId, imageUrls = [], onMessage
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({ message, chatId, imageUrls: imageUrls || [] }),
+    body: JSON.stringify({ message, chatId, imageUrls: imageUrls || [], deepThink, webSearch }),
     signal: controller.signal
   }).then(async response => {
     if (!response.ok) {

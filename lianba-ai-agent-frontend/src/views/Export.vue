@@ -188,8 +188,7 @@ const batchExporting = ref(false)
 
 const tabs = computed(() => [
   { value: 'all', label: '全部', count: sessions.value.length },
-  { value: 'love', label: 'AI恋爱大师', count: sessions.value.filter(s => s.agentType === 'love').length },
-  { value: 'super', label: 'AI超级智能体', count: sessions.value.filter(s => s.agentType === 'super').length }
+  { value: 'love', label: 'AI恋爱大师', count: sessions.value.filter(s => s.agentType === 'love').length }
 ])
 
 const filteredSessions = computed(() => {

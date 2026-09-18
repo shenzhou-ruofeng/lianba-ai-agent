@@ -1,4 +1,4 @@
-﻿package com.lianba.imagesearchmcpserver;
+package com.lianba.imagesearchmcpserver;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

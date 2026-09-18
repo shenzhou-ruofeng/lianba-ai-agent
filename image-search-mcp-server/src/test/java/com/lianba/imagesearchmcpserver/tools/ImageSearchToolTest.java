@@ -1,4 +1,4 @@
-﻿package com.lianba.imagesearchmcpserver.tools;
+package com.lianba.imagesearchmcpserver.tools;
 
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Assertions;

@@ -5,8 +5,10 @@ faster-whisper 本地语音识别 WebSocket 服务
 1. 客户端连接后先发送 JSON 配置消息（如 {"mode":"2pass","is_speaking":true}，服务端忽略）
 2. 客户端持续发送 16kHz 16bit Int16 PCM 二进制音频
 3. 客户端停止说话时发送 {"is_speaking": false}
-4. 服务端对整段音频做一次识别，返回 {"mode":"2pass-offline","text":"识别结果","is_final":true}
-   —— 前端 handleAsrMessage 识别到 offline 消息后自动作为定稿文本回填输入框
+4. 服务端识别并返回结果：
+   - 说话过程中每累积约 4 秒音频做一次临时识别，返回 {"mode":"2pass-online","text":"累计全文"}（实时出字）
+   - 客户端停止说话后做整段最终识别，返回 {"mode":"2pass-offline","text":"识别结果","is_final":true}
+   —— 前端收到 online 消息替换临时文本，收到 offline 消息后自动作为定稿文本回填输入框
 
 本地开发启动：
     pip install -r requirements.txt
@@ -37,6 +39,11 @@ MODEL_NAME = os.environ.get("WHISPER_MODEL", "small")
 HOST = os.environ.get("WHISPER_HOST", "127.0.0.1")
 PORT = int(os.environ.get("WHISPER_PORT", "10095"))
 
+# 说话过程中临时识别的音频增量间隔（秒）：越小出字越快，但 CPU 占用越高
+INTERIM_INTERVAL_SEC = 4.0
+# initial_prompt 引导模型输出简体中文（whisper 中文默认易输出繁体）
+SIMPLIFIED_CHINESE_PROMPT = "以下是普通话的简体中文句子。"
+
 # 延迟加载模型（首次运行会自动下载模型文件，之后从本地缓存加载）
 _model = None
 
@@ -52,12 +59,40 @@ def get_model():
     return _model
 
 
+def transcribe_audio(audio):
+    """识别音频为简体中文文本（贪婪解码 + VAD 过滤静音段，关闭上下文继承提升速度并避免重复循环）"""
+    segments, _ = get_model().transcribe(
+        audio,
+        language="zh",
+        beam_size=1,
+        condition_on_previous_text=False,
+        vad_filter=True,
+        vad_parameters=dict(min_silence_duration_ms=500),
+        initial_prompt=SIMPLIFIED_CHINESE_PROMPT,
+    )
+    return "".join(seg.text for seg in segments).replace(" ", "")
+
+
 async def handle_client(ws):
     pcm_chunks = []
+    interim_covered = 0  # 已做过临时识别的音频字节数
     try:
         async for message in ws:
             if isinstance(message, (bytes, bytearray)):
                 pcm_chunks.append(bytes(message))
+                # 说话过程中：每累积约 INTERIM_INTERVAL_SEC 秒新音频做一次临时识别，实时返回已出文字
+                total = sum(len(c) for c in pcm_chunks)
+                if total - interim_covered >= INTERIM_INTERVAL_SEC * 16000 * 2:
+                    interim_covered = total
+                    audio = np.frombuffer(b"".join(pcm_chunks), dtype=np.int16).astype(np.float32) / 32768.0
+                    if len(audio) >= 1600:
+                        try:
+                            text = await asyncio.to_thread(transcribe_audio, audio)
+                            if text:
+                                log.info("临时识别: %s", text)
+                                await ws.send(json.dumps({"mode": "2pass-online", "text": text}, ensure_ascii=False))
+                        except Exception as e:
+                            log.warning("临时识别失败: %s", e)
             else:
                 try:
                     data = json.loads(message)
@@ -80,14 +115,7 @@ async def handle_client(ws):
 
     log.info("收到音频 %.1f 秒，开始识别...", len(audio) / 16000.0)
     try:
-        segments, _ = get_model().transcribe(
-            audio,
-            language="zh",
-            beam_size=1,
-            vad_filter=True,
-            vad_parameters=dict(min_silence_duration_ms=500),
-        )
-        text = "".join(seg.text for seg in segments).replace(" ", "")
+        text = await asyncio.to_thread(transcribe_audio, audio)
         log.info("识别结果: %s", text)
         result = json.dumps({"mode": "2pass-offline", "text": text, "is_final": True}, ensure_ascii=False)
         try:

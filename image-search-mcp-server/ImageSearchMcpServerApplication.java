@@ -1,4 +1,4 @@
-package com.lianba.imagesearchmcpserver;
+﻿package com.lianba.imagesearchmcpserver;
 
 import com.lianba.imagesearchmcpserver.tools.ImageSearchTool;
 import org.springframework.ai.tool.ToolCallbackProvider;
@@ -22,3 +22,4 @@ public class ImageSearchMcpServerApplication {
     }
 
 }
+

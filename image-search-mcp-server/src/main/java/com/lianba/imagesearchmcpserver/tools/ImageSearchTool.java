@@ -1,4 +1,4 @@
-﻿package com.lianba.imagesearchmcpserver.tools;
+package com.lianba.imagesearchmcpserver.tools;
 
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.http.HttpUtil;
@@ -40,11 +40,11 @@ public class ImageSearchTool {
      * @return
      */
     public List<String> searchMediumImages(String query) {
-        // 设置请求头（包含API密钥）
+        // 设置请求头（包含 API 密钥）
         Map<String, String> headers = new HashMap<>();
         headers.put("Authorization", apiKey);
 
-        // 设置请求参数（仅包含query，可根据文档补充page、per_page等参数）
+        // 设置请求参数（仅包含 query，可根据文档补充 page、per_page 等参数）
         Map<String, Object> params = new HashMap<>();
         params.put("query", query);
 
@@ -55,12 +55,12 @@ public class ImageSearchTool {
                 .execute()
                 .body();
 
-        // 解析响应JSON（假设响应结构包含"photos"数组，每个元素包含"medium"字段）
+        // 解析响应 JSON（假设响应结构包含"photos"数组，每个元素包含"medium"字段）
         return JSONUtil.parseObj(response)
                 .getJSONArray("photos")
                 .stream()
                 .map(photoObj -> (JSONObject) photoObj)
-                .map(photoObj -> photoObj.getJSONObject("src"))
+                .map(photo -> photo.getJSONObject("src"))
                 .map(photo -> photo.getStr("medium"))
                 .filter(StrUtil::isNotBlank)
                 .collect(Collectors.toList());

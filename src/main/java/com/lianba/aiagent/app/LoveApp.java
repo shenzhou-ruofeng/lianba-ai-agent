@@ -13,6 +13,7 @@ import com.lianba.aiagent.rag.LoveAppContextualQueryAugmenterFactory;
 import com.lianba.aiagent.rag.LoveAppDocumentLoader;
 import com.lianba.aiagent.rag.LoveAppRagCustomAdvisorFactory;
 import com.lianba.aiagent.rag.QueryRewriter;
+import com.lianba.aiagent.service.DeepSeekChatService;
 import com.lianba.aiagent.service.UsageStatisticsService;
 import com.lianba.aiagent.service.UserService;
 import jakarta.annotation.Resource;
@@ -37,6 +38,7 @@ import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.vectorstore.SearchRequest;
@@ -76,6 +78,10 @@ public class LoveApp {
 
     @Resource
     private UsageStatisticsService usageStatisticsService;
+
+    // DeepSeek 服务：图文多模态理解（DeepSeek-Flash）+ 深度思考推理（thinking 模式）
+    @Resource
+    private DeepSeekChatService deepSeekChatService;
 
     private static final String SYSTEM_PROMPT = """
             你是深耕恋爱心理领域的专家，同时也是一位贴心的生活助手。
@@ -557,6 +563,24 @@ public class LoveApp {
      * @return SseEmitter 流式响应
      */
     public SseEmitter doChatWithToolsStream(String message, String chatId, List<String> imageUrls) {
+        return doChatWithToolsStream(message, chatId, imageUrls, false, false);
+    }
+
+    /**
+     * 带工具调用的流式对话（SSE，支持深度思考/联网搜索开关）。
+     * - deepThink=true：先调用 DeepSeek deepseek-flash 模型（thinking 模式）流式输出推理过程（thinking 事件），再进入主对话链路
+     * - webSearch=true：注入联网搜索指令，引导模型优先调用 searchWeb 工具检索最新信息
+     * - 含图片时：调用 DeepSeek-Flash 多模态模型直接理解图文内容（替代原 MIMO 视觉服务）
+     *
+     * @param message    用户消息
+     * @param chatId     会话 ID
+     * @param imageUrls  用户上传的图片 URL 列表（可为 null）
+     * @param deepThink  是否开启深度思考
+     * @param webSearch  是否开启联网搜索
+     * @return SseEmitter 流式响应
+     */
+    public SseEmitter doChatWithToolsStream(String message, String chatId, List<String> imageUrls,
+                                            boolean deepThink, boolean webSearch) {
         SseEmitter sseEmitter = new SseEmitter(300000L);
 
         CompletableFuture.runAsync(() -> {
@@ -566,28 +590,57 @@ public class LoveApp {
                 messages.add(new SystemMessage(buildPersonalizedSystemPrompt(chatId)));
                 messages.addAll(chatMemory.get(chatId));
 
-                // 构建用户消息（如有图片则附加 URL 上下文）
+                // 构建用户消息（如有图片则交给 DeepSeek-Flash 多模态理解，并附加 URL 上下文供图生图引用）
                 String userText = message;
                 if (imageUrls != null && !imageUrls.isEmpty()) {
+                    // DeepSeek-Flash 直接处理图文请求：结合用户问题对图片进行多模态理解
+                    String visionPrompt = "用户上传了图片并提问：" + message
+                            + "\n请先详细描述图片内容（场景、人物、物体、文字、氛围等），再结合用户问题给出针对性回答。";
+                    String visionResult = deepSeekChatService.chatWithImages(visionPrompt, imageUrls);
+                    if (visionResult != null && !visionResult.isBlank()) {
+                        userText += "\n\n[DeepSeek 图片理解与图文分析结果]\n" + visionResult;
+                    }
                     userText += "\n\n[用户上传的图片地址]\n" + String.join("\n", imageUrls)
                             + "\n（如果用户要求基于上传图片修改/重绘/生成新图，请调用 generateImage 工具并将上述图片地址作为 referenceImageUrl 参数传入）";
                 }
-                UserMessage userMessage = new UserMessage(userText);
-                messages.add(userMessage);
-                chatMemory.add(chatId, userMessage);
 
-                // 2. 通知前端：正在思考
+                // 联网搜索开关：注入指令引导模型优先调用 searchWeb 工具
+                String modelInputText = userText;
+                if (webSearch) {
+                    modelInputText += "\n\n[系统指令] 用户已开启联网搜索，请先调用 searchWeb 工具检索与用户问题相关的最新网络信息，再结合搜索结果回答；若问题与时效信息无关，可简要检索后直接回答。";
+                }
+                UserMessage userMessage = new UserMessage(modelInputText);
+                messages.add(userMessage);
+                // 记忆保存原始消息（不含注入的系统指令与图片理解内容，避免污染历史上下文）
+                chatMemory.add(chatId, new UserMessage(message));
+
+                // 2. 深度思考：调用 deepseek-flash（thinking 模式）流式推送推理过程，推理结论作为参考注入主对话
+                if (deepThink) {
+                    sendSse(sseEmitter, buildStatusJson("deep_thinking", "正在深度思考中..."));
+                    String reasoning = deepSeekChatService.streamDeepThink(userText,
+                            chunk -> sendSse(sseEmitter, buildThinkingJson(chunk)));
+                    if (reasoning != null && !reasoning.isBlank()) {
+                        // 将推理分析结论注入主模型上下文，提升最终回答质量
+                        String analysis = reasoning.length() > 2000 ? reasoning.substring(reasoning.length() - 2000) : reasoning;
+                        messages.add(new SystemMessage("[深度思考分析参考]（请在回答中吸收以下分析结论，但不要把分析过程原文展示给用户）\n" + analysis));
+                    }
+                }
+
+                // 3. 通知前端：正在思考
                 sendSse(sseEmitter, buildStatusJson("thinking", "正在思考中..."));
 
-                // 3. 调用模型（禁用内置工具执行，手动控制流程）
+                // 4. 调用模型（禁用内置工具执行，手动控制流程）
                 ChatOptions chatOptions = ToolCallingChatOptions.builder()
                         .toolCallbacks(allTools)
                         .internalToolExecutionEnabled(false)
                         .build();
                 Prompt prompt = new Prompt(messages, chatOptions);
-                ChatResponse chatResponse = chatModel.call(prompt);
+                // 首轮调用改为流式：文本分片实时推送前端（AI 回答逐字输出）
+                ChatResponse chatResponse = callModelStreaming(prompt, 0, sseEmitter);
+                // 首轮即返回纯文本（无工具调用）时，最终回复已流式推送，无需重复发送
+                boolean finalTextStreamed = !chatResponse.hasToolCalls();
 
-                // 4. 工具调用循环
+                // 5. 工具调用循环
                 int round = 0;
                 List<String[]> generatedFiles = new ArrayList<>();
                 while (chatResponse.hasToolCalls()) {
@@ -646,13 +699,13 @@ public class LoveApp {
                     chatResponse = chatModel.call(prompt);
                 }
 
-                // 5. 模型不再调用工具，发送最终文本回复（逐块流式推送）
+                // 6. 模型不再调用工具，处理最终回复（首轮流式调用时文本已实时推送，此处仅发送工具轮后的完整回复）
                 AssistantMessage finalMessage = chatResponse.getResult().getOutput();
                 String content = finalMessage.getText();
                 chatMemory.add(chatId, finalMessage);
                 log.info("[工具对话] chatId: {}, 共 {} 轮工具调用, 最终回复长度: {}", chatId, round, content != null ? content.length() : 0);
 
-                if (content != null && !content.isEmpty()) {
+                if (!finalTextStreamed && content != null && !content.isEmpty()) {
                     sendSse(sseEmitter, buildTextJson(round, content));
                 }
 
@@ -691,6 +744,71 @@ public class LoveApp {
         sseEmitter.onCompletion(() -> log.info("[工具对话] chatId: {} SSE 连接完成", chatId));
 
         return sseEmitter;
+    }
+
+    /**
+     * 流式调用模型：文本分片实时推送前端（AI 回答逐字输出），并聚合为完整 ChatResponse 返回。
+     * 若响应包含工具调用（流式分片按增量拼接聚合），交由上层工具循环处理。
+     *
+     * @param prompt     请求
+     * @param round      当前工具调用轮次（用于文本消息的 step 标识）
+     * @param sseEmitter SSE 推送器
+     * @return 聚合后的完整 ChatResponse
+     */
+    private ChatResponse callModelStreaming(Prompt prompt, int round, SseEmitter sseEmitter) {
+        StringBuilder textBuilder = new StringBuilder();
+        // 工具调用分片聚合：id 非空按 id 归并；id 为空时带 name 视为新调用，否则并入最后一个调用
+        List<String> toolIds = new ArrayList<>();
+        List<String> toolNames = new ArrayList<>();
+        List<StringBuilder> toolArgs = new ArrayList<>();
+
+        // doOnNext：每个文本分片到达时立即推送 SSE（流式逐字输出），不能先 collectList 再遍历（会等全部生成完才发）
+        chatModel.stream(prompt)
+                .doOnNext(chunk -> {
+                    if (chunk == null || chunk.getResult() == null || chunk.getResult().getOutput() == null) {
+                        return;
+                    }
+                    AssistantMessage output = chunk.getResult().getOutput();
+                    String text = output.getText();
+                    if (text != null && !text.isEmpty()) {
+                        textBuilder.append(text);
+                        // 文本分片实时推送（工具调用响应一般无文本）
+                        sendSse(sseEmitter, buildTextJson(round, text));
+                    }
+                    for (AssistantMessage.ToolCall toolCall : output.getToolCalls()) {
+                        String id = toolCall.id();
+                        int idx;
+                        if (id != null && !id.isEmpty()) {
+                            idx = toolIds.indexOf(id);
+                        } else if (toolCall.name() != null && !toolCall.name().isEmpty()) {
+                            idx = -1;
+                        } else {
+                            idx = toolNames.size() - 1;
+                        }
+                        if (idx < 0) {
+                            toolIds.add(id == null ? "" : id);
+                            toolNames.add(toolCall.name() == null ? "" : toolCall.name());
+                            toolArgs.add(new StringBuilder(toolCall.arguments() == null ? "" : toolCall.arguments()));
+                        } else {
+                            if (toolNames.get(idx).isEmpty() && toolCall.name() != null && !toolCall.name().isEmpty()) {
+                                toolNames.set(idx, toolCall.name());
+                            }
+                            if (toolCall.arguments() != null) {
+                                toolArgs.get(idx).append(toolCall.arguments());
+                            }
+                        }
+                    }
+                })
+                .blockLast();
+
+        List<AssistantMessage.ToolCall> toolCalls = new ArrayList<>();
+        for (int i = 0; i < toolNames.size(); i++) {
+            if (!toolNames.get(i).isEmpty()) {
+                toolCalls.add(new AssistantMessage.ToolCall(toolIds.get(i), "function", toolNames.get(i), toolArgs.get(i).toString()));
+            }
+        }
+        AssistantMessage aggregatedMessage = new AssistantMessage(textBuilder.toString(), Map.of(), toolCalls);
+        return new ChatResponse(List.of(new Generation(aggregatedMessage)));
     }
 
     /**
@@ -799,6 +917,13 @@ public class LoveApp {
     private String buildTextJson(int step, String content) {
         return "{\"type\":\"text\",\"step\":" + step
                 + ",\"content\":\"" + escapeJson(content) + "\"}";
+    }
+
+    /**
+     * 构建深度思考推理内容事件（前端以可折叠思考卡片展示）
+     */
+    private String buildThinkingJson(String content) {
+        return "{\"type\":\"thinking\",\"content\":\"" + escapeJson(content) + "\"}";
     }
 
     private String buildFilesJson(List<String[]> files) {

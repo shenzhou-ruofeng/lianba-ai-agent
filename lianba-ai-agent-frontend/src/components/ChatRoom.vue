@@ -410,6 +410,35 @@
           :disabled="isParsing || (!inputMessage.trim() && !hasReadyAttachments)"
         >{{ isParsing ? '解析中' : '发送' }}</button>
       </div>
+      <!-- 输入框下方：深度思考 / 智能搜索 开关按钮（DeepSeek 风格胶囊） -->
+      <div class="chat-input-toolbar">
+        <button
+          class="input-mode-chip"
+          :class="{ active: deepThinkOn }"
+          :disabled="connectionStatus === 'connecting'"
+          :title="deepThinkOn ? '已开启深度思考：AI 先推理分析再回答' : '开启后 AI 将先进行深度推理分析再回答'"
+          @click="deepThinkOn = !deepThinkOn"
+        >
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.4 1 2.3h6c0-.9.4-1.8 1-2.3A7 7 0 0 0 12 2z"/>
+            <line x1="9" y1="21" x2="15" y2="21"/>
+          </svg>
+          深度思考
+        </button>
+        <button
+          class="input-mode-chip"
+          :class="{ active: webSearchOn }"
+          :disabled="connectionStatus === 'connecting'"
+          :title="webSearchOn ? '已开启联网搜索：AI 回答前将检索网络信息' : '开启后 AI 将联网搜索最新信息辅助回答'"
+          @click="webSearchOn = !webSearchOn"
+        >
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          智能搜索
+        </button>
+      </div>
     </div>
 
     <!-- 语音输入悬浮按钮（右下角，FunASR 优先，浏览器语音识别降级） -->
@@ -472,6 +501,10 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['send-message', 'generate-report', 'update:chatMode', 'update:matchGender', 'stop-generation', 'quick-send'])
+
+// 输入区能力开关：深度思考（AI 先推理再回答）/ 智能搜索（回答前联网检索）
+const deepThinkOn = ref(false)
+const webSearchOn = ref(false)
 
 // 能力引导气泡：点击后自动填入输入框并发送
 const capabilityGuides = [
@@ -941,7 +974,10 @@ const sendMessage = () => {
       chunks: doc.chunks,
       textContent: doc.textContent || '',
       imported: importDocs
-    }))
+    })),
+    // 能力开关状态：随消息透传给后端
+    deepThink: deepThinkOn.value,
+    webSearch: webSearchOn.value
   })
 
   inputMessage.value = ''
@@ -1269,6 +1305,49 @@ onMounted(() => {
   gap: 6px;
   align-items: flex-end;
   flex-wrap: nowrap;
+}
+
+/* 输入框下方能力开关工具栏（深度思考 / 智能搜索） */
+.chat-input-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px 10px;
+}
+
+.input-mode-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid #e3e3e3;
+  border-radius: 16px;
+  background: #fff;
+  color: #666;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.input-mode-chip:hover:not(:disabled) {
+  color: #ff6b8b;
+  border-color: #ffb3c6;
+  background-color: #fff5f7;
+}
+
+.input-mode-chip.active {
+  color: #fff;
+  background: linear-gradient(135deg, #ff6b8b, #ff8fa3);
+  border-color: transparent;
+  box-shadow: 0 2px 8px rgba(255, 107, 139, 0.35);
+}
+
+.input-mode-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* 语音输入悬浮按钮：固定在聊天区右下角（输入区上方） */

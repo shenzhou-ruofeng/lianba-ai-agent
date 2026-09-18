@@ -2,7 +2,7 @@ package com.lianba.aiagent.controller;
 
 import cn.hutool.core.util.StrUtil;
 import com.lianba.aiagent.constant.FileConstant;
-import com.lianba.aiagent.service.MiMoVisionService;
+import com.lianba.aiagent.service.DeepSeekChatService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -33,7 +33,7 @@ import java.util.*;
 public class ImageUploadController {
 
     @Resource
-    private MiMoVisionService miMoVisionService;
+    private DeepSeekChatService deepSeekChatService;
 
     /** 最大文件大小：10MB */
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -136,9 +136,9 @@ public class ImageUploadController {
     }
 
     /**
-     * 解析图片：上传保存 + MIMO 视觉理解，一次完成。
+     * 解析图片：上传保存 + DeepSeek-Flash 多模态视觉理解，一次完成。
      * 前端在用户选择图片后立即调用，解析结果随后随提示词一起发送给智能体。
-     * 通过字节 base64 直传 MIMO，避免本地图片 URL 外网不可达导致 AI 获取不到图片。
+     * 通过字节 base64 直传 DeepSeek，避免本地图片 URL 外网不可达导致 AI 获取不到图片。
      *
      * @param file    单张图片文件
      * @param request HTTP 请求（用于构建完整 URL）
@@ -182,8 +182,8 @@ public class ImageUploadController {
             String savedFileName = saveImage(file, extension);
             String imageUrl = buildImageUrl(request, savedFileName);
 
-            // 字节直传 MIMO 进行视觉理解
-            String understanding = miMoVisionService.understandImageBytes(imageBytes, contentType, null);
+            // 字节直传 DeepSeek-Flash 进行多模态视觉理解
+            String understanding = deepSeekChatService.understandImageBytes(imageBytes, contentType, null);
 
             result.put("success", true);
             result.put("fileName", savedFileName);

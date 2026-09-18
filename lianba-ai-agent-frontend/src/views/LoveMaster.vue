@@ -229,10 +229,13 @@ const addToolStepMessage = (step, toolCalls) => {
   }
 }
 
-// 发送消息（支持图片/文档附件，附件已在待上传区解析完成）
+// 发送消息（支持图片/文档附件，附件已在待上传区解析完成；支持深度思考/智能搜索开关）
 const sendMessage = (message, attachments = {}) => {
   const images = attachments.images || []
   const docs = attachments.docs || []
+  // 能力开关：随消息透传给后端
+  const deepThink = !!attachments.deepThink
+  const webSearch = !!attachments.webSearch
 
   // 引用模式：附件与提示词合并为一条用户消息
   if (images.length > 0 || docs.length > 0) {
@@ -316,16 +319,23 @@ const sendMessage = (message, attachments = {}) => {
     const uploadedImageUrls = images.map(img => img.url).filter(u => u)
     eventSource = chatWithLoveAppVision(
       outboundMessage, chatId.value, uploadedImageUrls,
-      (data) => handleToolsSseMessage(data, aiMessageIndex, aiSessionIndex),
+      (data) => {
+        handleToolsSseMessage(data, aiMessageIndex, aiSessionIndex)
+        // 与 GET 模式一致：收到 [DONE] 结束对话状态（否则停止按钮一直显示）
+        if (data === '[DONE]') {
+          connectionStatus.value = 'disconnected'
+        }
+      },
       (error) => {
         console.error('Vision SSE Error:', error)
         connectionStatus.value = 'disconnected'
         if (eventSource) eventSource.close()
-      }
+      },
+      { deepThink, webSearch }
     )
   } else {
     // === 纯文本工具调用模式：GET + JSON SSE ===
-    eventSource = chatWithLoveApp(outboundMessage, chatId.value)
+    eventSource = chatWithLoveApp(outboundMessage, chatId.value, { deepThink, webSearch })
     eventSource.onmessage = (event) => {
       handleToolsSseMessage(event.data, aiMessageIndex, aiSessionIndex)
       if (event.data === '[DONE]') {
@@ -348,7 +358,7 @@ const sendMessage = (message, attachments = {}) => {
 
 /**
  * 处理工具调用 SSE 的 JSON 消息（复用超级智能体的消息格式）
- * 支持：tool_call / tool_result / text / generated_image / files / status
+ * 支持：tool_call / tool_result / text / thinking / generated_image / files / status
  */
 const handleToolsSseMessage = (rawData, aiMessageIndex, aiSessionIndex) => {
   if (!rawData || rawData === '[DONE]') return
@@ -372,6 +382,21 @@ const handleToolsSseMessage = (rawData, aiMessageIndex, aiSessionIndex) => {
       const lastCall = currentToolCalls[currentToolCalls.length - 1]
       if (lastCall && !lastCall.result) lastCall.result = parsed.result || ''
       addToolStepMessage(currentToolStep, currentToolCalls)
+    }
+  } else if (parsed.type === 'thinking') {
+    // 深度思考过程（DeepSeek reasoner 推理内容流式分片）：追加到当前思考卡片
+    const content = parsed.content || ''
+    if (!content) return
+    // 若思考前已有工具步骤，先落盘
+    if (currentToolCalls.length > 0) {
+      addToolStepMessage(currentToolStep, currentToolCalls)
+      currentToolCalls = []
+    }
+    const last = messages.value[messages.value.length - 1]
+    if (last && last.type === 'thinking' && !last.isUser) {
+      last.content += content
+    } else {
+      addMessage(content, false, 'thinking')
     }
   } else if (parsed.type === 'text') {
     // 保存之前的工具步骤
