@@ -487,7 +487,32 @@ SSE 流式配置被 Nginx 缓冲了。检查第 5.3 节的配置：
 2. Docker Desktop → 右下角齿轮 Settings → Docker Engine → 确认为上述内容 → Apply & Restart。
 3. 等待引擎重启后验证：`docker info` 输出里能看到 `Registry Mirrors` 列表。
 
-### 8.9 磁盘空间不足
+### 8.9 服务器执行 install.sh 报 compose 版本错误
+
+若看到类似以下报错：
+
+- `unsupported Compose file version`
+- `services.backend.depends_on contains an invalid type`
+- `Key 'restart' ... is invalid`
+
+说明服务器的 Docker Compose 版本过旧（v1）。处理：宝塔面板 → Docker → 设置 → 检查并升级 Docker；或在宝塔终端执行：
+
+```bash
+curl -SL https://mirrors.aliyun.com/docker-ce/linux/ubuntu/dists/jammy/pool/stable/amd64/docker-compose-plugin_2.24.5-1~ubuntu.22.04~jammy_amd64.deb -o /tmp/compose.deb && dpkg -i /tmp/compose.deb && docker compose version
+```
+
+> CentOS/Alibaba Cloud Linux 系统不必用上面的命令，直接升级宝塔的 Docker 管理器即可。
+
+### 8.10 如何确认每个容器都健康
+
+```bash
+cd /www/wwwroot/lianba-ai-agent
+docker compose -f docker-compose.prod.yml ps          # 4 个容器应为 Up / Up (healthy)
+curl http://127.0.0.1:8090/api/health                 # 返回 {"data":"ok",...} 表示全链路通
+docker stats --no-stream                              # 看内存占用是否健康
+```
+
+### 8.11 磁盘空间不足
 
 ```bash
 df -h                                # 看占用
