@@ -18,6 +18,21 @@
 
 在业务之外，项目完整实践了 AI 应用的主流工程化能力：**SSE 流式输出、RAG 混合检索（向量 + 全文）、多模态理解、工具调用、MCP 服务集成、自主规划智能体（Manus）、语音输入**，是一套可直接部署上线的 AI 应用模板。
 
+### 界面预览
+
+以下为项目实际运行界面截图（对话与报告内容均为演示数据）：
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/images/home.png" width="400" alt="首页"><br><sub>首页</sub></td>
+    <td align="center"><img src="docs/images/login.png" width="400" alt="登录页"><br><sub>登录 / 注册</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/love-master-chat.png" width="400" alt="AI 恋爱大师对话"><br><sub>AI 恋爱大师 · 多轮对话与匹配模式</sub></td>
+    <td align="center"><img src="docs/images/love-report.png" width="400" alt="恋爱报告"><br><sub>恋爱报告</sub></td>
+  </tr>
+</table>
+
 ## 二、核心功能特性
 
 | 功能模块 | 说明 | 核心实现 |
@@ -69,6 +84,59 @@
 | --- | --- | --- |
 | image-search-mcp-server | Spring Boot 3.4.5 + Spring AI MCP Server（`spring-ai-starter-mcp-server-webmvc`） | 图片搜索 MCP 服务，默认 SSE 模式，端口 8127 |
 | faster-whisper-server | Python + faster-whisper + WebSocket | 本地语音识别服务，端口 10095，协议兼容前端 FunASR 2pass 简化版 |
+
+### 系统架构
+
+```mermaid
+flowchart TB
+    subgraph CLIENT["客户端"]
+        FE["Vue 3 前端<br/>首页 / 恋爱大师 / 恋爱报告 / 情感日记 / 社区"]
+    end
+
+    subgraph SERVICES["配套服务"]
+        VOICE["语音识别服务 :10095<br/>faster-whisper WebSocket"]
+        MCP["图片搜索 MCP 服务 :8127<br/>Spring AI MCP Server（SSE）"]
+    end
+
+    subgraph BACKEND["后端主服务 :8123 · /api · Spring Boot 3 + Spring AI"]
+        SSE["接口层<br/>REST + SSE（11 个 Controller）"]
+        AI["AI 内核<br/>ChatClient / Advisor / 对话记忆"]
+        RAG["RAG 混合检索<br/>向量 + 全文（RRF 融合）"]
+        AGENT["自主规划智能体<br/>ReAct / ToolCall / Manus"]
+        TOOLS["工具集（12 个）<br/>联网搜索 / 文件 / PDF / 生图 / 邮件"]
+    end
+
+    subgraph DATA["数据层"]
+        PG[("PostgreSQL + pgvector<br/>业务表 + 向量库")]
+    end
+
+    subgraph EXT["外部服务"]
+        DS["阿里云百炼 DashScope"]
+        DSK["DeepSeek"]
+        SAPI["SearchAPI"]
+        PX["Pexels"]
+        OSS["阿里云 OSS"]
+    end
+
+    FE -->|"HTTP / SSE 流式"| SSE
+    FE -.->|"WebSocket 语音输入"| VOICE
+    SSE --> AI
+    AI --> RAG
+    AI --> AGENT
+    AGENT --> TOOLS
+    AI -->|"MCP 客户端（SSE）"| MCP
+    RAG -->|"检索 / 写入"| PG
+    AI -->|"对话 · 向量化 · 生图"| DS
+    AI -->|"多模态 · 深度思考"| DSK
+    TOOLS -->|"联网搜索"| SAPI
+    TOOLS -->|"导出产物 / 上传"| OSS
+    MCP -->|"图片搜索 API"| PX
+```
+
+- 前端只负责交互（HTTP / SSE + WebSocket 语音），不直接接触模型；
+- 后端是唯一的能力编排中枢：对话、RAG、工具、智能体统一由 Spring AI 内核调度；
+- 图片搜索以 MCP 协议独立部署，与主服务解耦（支持 SSE / stdio 两种接入方式）；
+- 数据统一沉淀在 PostgreSQL：业务表由 Flyway 迁移管理，向量数据由 pgvector 存储。
 
 ### 部署
 
