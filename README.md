@@ -20,16 +20,20 @@
 
 ### 界面预览
 
-以下为项目实际运行界面截图（对话与报告内容均为演示数据）：
+以下均为项目实际运行界面截图（对话与报告内容为演示数据）：
 
 <table>
   <tr>
-    <td align="center"><img src="docs/images/home.png" width="400" alt="首页"><br><sub>首页</sub></td>
-    <td align="center"><img src="docs/images/login.png" width="400" alt="登录页"><br><sub>登录 / 注册</sub></td>
+    <td align="center"><img src="docs/images/home.png" width="420" alt="首页"><br><sub>首页：知心伴侣与全能助手</sub></td>
+    <td align="center"><img src="docs/images/login.png" width="420" alt="登录 / 注册"><br><sub>登录 / 注册（邮箱验证码）</sub></td>
   </tr>
   <tr>
-    <td align="center"><img src="docs/images/love-master-chat.png" width="400" alt="AI 恋爱大师对话"><br><sub>AI 恋爱大师 · 多轮对话与匹配模式</sub></td>
-    <td align="center"><img src="docs/images/love-report.png" width="400" alt="恋爱报告"><br><sub>恋爱报告</sub></td>
+    <td align="center"><img src="docs/images/onboarding.png" width="420" alt="情感状态引导"><br><sub>首次进入：情感状态引导</sub></td>
+    <td align="center"><img src="docs/images/love-master.png" width="420" alt="AI 恋爱大师对话"><br><sub>AI 恋爱大师：多轮对话与对象推荐模式</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/love-report.png" width="420" alt="恋爱报告"><br><sub>恋爱报告：结构化建议与导出</sub></td>
+    <td align="center"><img src="docs/images/diary.png" width="420" alt="情感日记"><br><sub>情感日记与每日情感建议</sub></td>
   </tr>
 </table>
 
