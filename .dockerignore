@@ -3,10 +3,18 @@ target/
 **/target/
 
 # 前端（由独立镜像构建，不进入后端上下文）
-yu-ai-agent-frontend/
+lianba-ai-agent-frontend/
 
 # MCP 服务（由独立镜像构建，不进入后端上下文）
-yu-image-search-mcp-server/
+image-search-mcp-server/
+
+# 语音识别服务（独立 Python 服务，不进入后端上下文）
+faster-whisper-server/
+
+# 部署产物与文档
+
+deploy/
+docs/
 
 # 依赖与缓存
 **/node_modules/

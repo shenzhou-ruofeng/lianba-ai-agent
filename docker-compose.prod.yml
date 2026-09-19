@@ -1,0 +1,120 @@
+# =====================================================================
+# 生产部署专用 Compose 文件（阿里云服务器 + 宝塔面板 + Docker）
+#
+# 用途：
+#   本地（Windows）：docker compose -f docker-compose.prod.yml build
+#                    → 构建 3 个应用镜像，导出后上传服务器
+#   服务器（Linux）： docker load 导入镜像后
+#                    docker compose -f docker-compose.prod.yml up -d
+#
+# 与开发用 docker-compose.yml 的区别：
+#   1. 所有端口只绑定 127.0.0.1，不对公网暴露（外网入口只有宝塔 Nginx）
+#   2. 前端映射 127.0.0.1:8090（避开宝塔 Nginx 占用的 80 端口）
+#   3. 限制 JVM / PostgreSQL 内存占用（适配 2G 内存服务器）
+#   4. 统一时区为 Asia/Shanghai
+#   5. 数据库密码强制从 .env 注入（禁止使用默认弱密码）
+# =====================================================================
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: lianba-ai-agent-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-lianba_ai_agent}
+      POSTGRES_USER: ${DB_USERNAME:-shenzhou_ruofeng}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?请先创建 .env 并设置 DB_PASSWORD}
+      TZ: Asia/Shanghai
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # 2G 内存优化：缩小缓冲区和连接数上限
+    command:
+      - postgres
+      - -c
+      - shared_buffers=96MB
+      - -c
+      - max_connections=30
+      - -c
+      - work_mem=4MB
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-shenzhou_ruofeng} -d ${DB_NAME:-lianba_ai_agent}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - lianba-ai-agent-net
+
+  mcp-server:
+    image: lianba-ai-agent-mcp-server:prod
+    build:
+      context: ./image-search-mcp-server
+      dockerfile: Dockerfile
+    container_name: lianba-ai-agent-mcp-server
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: sse
+      TZ: Asia/Shanghai
+      # 2G 内存优化：SerialGC + 限制堆内存
+      JAVA_OPTS: "-Dfile.encoding=UTF-8 -Xms128m -Xmx192m -XX:MaxMetaspaceSize=128m -XX:+UseSerialGC"
+    healthcheck:
+      # corretto 基于 Amazon Linux，自带 bash，用 /dev/tcp 探测端口就绪
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/8127' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - lianba-ai-agent-net
+
+  backend:
+    image: lianba-ai-agent-backend:prod
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lianba-ai-agent-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mcp-server:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      TZ: Asia/Shanghai
+      # 2G 内存优化：SerialGC + 限制堆内存
+      JAVA_OPTS: "-Dfile.encoding=UTF-8 -Xms256m -Xmx512m -XX:MaxMetaspaceSize=160m -XX:+UseSerialGC"
+      # 数据库指向 compose 内的 postgres 服务
+      DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-lianba_ai_agent}
+      DB_USERNAME: ${DB_USERNAME:-shenzhou_ruofeng}
+      DB_PASSWORD: ${DB_PASSWORD:?请先创建 .env 并设置 DB_PASSWORD}
+      # MCP 服务指向 compose 内的 mcp-server 服务（客户端会自动追加 /sse）
+      MCP_SERVER1_URL: http://mcp-server:8127
+      # 大模型/解析服务密钥（DashScope/MinerU/MiMo/SearchAPI）已统一配置在 application-prod.yml（打包进镜像），此处无需注入
+    volumes:
+      # 持久化解析产物（file/pdf 等），宿主机目录为 compose 文件旁的 ./tmp
+      - ./tmp:/app/tmp
+    networks:
+      - lianba-ai-agent-net
+
+  frontend:
+    image: lianba-ai-agent-frontend:prod
+    build:
+      context: ./lianba-ai-agent-frontend
+      dockerfile: Dockerfile
+    container_name: lianba-ai-agent-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      # 只绑定本机回环地址，由宝塔 Nginx 反向代理对外提供服务；
+      # 8090 避开宝塔 Nginx 已占用的 80 端口
+      - "127.0.0.1:8090:80"
+    environment:
+      TZ: Asia/Shanghai
+    networks:
+      - lianba-ai-agent-net
+
+volumes:
+  pgdata:
+
+networks:
+  lianba-ai-agent-net:
+    driver: bridge

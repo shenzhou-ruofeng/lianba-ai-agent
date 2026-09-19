@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: image-search-mcp-server
+  profiles:
+    active: sse
+server:
+  port: 8127
+# Pexels 图片搜索 API Key（对应 ImageSearchTool 的 @Value("${pexels.api-key}")）
+# 使用前请复制本文件为同目录下的 application.yml，并填入自己的 Pexels API Key
+# 申请地址：https://www.pexels.com/api/
+pexels:
+  api-key: your-pexels-api-key
